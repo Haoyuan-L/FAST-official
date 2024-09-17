@@ -1,10 +1,11 @@
 import torch
 import contextlib
 from torch.utils.data import DataLoader
-from medmnist.dataset import PathMNIST, Dermamnist
+from medmnist.dataset import PathMNIST, DermaMNIST
 from torchvision.datasets import CIFAR10, SVHN
 import torchvision.transforms as transforms
 import numpy as np
+from utils import *
 
 
 def get_transforms(dataset_name, augmentation=True):
@@ -28,7 +29,7 @@ def get_transforms(dataset_name, augmentation=True):
     return transforms.Compose(data_transform)
 
 def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, 
-             split_fn=None, num_workers=4, seed=0, data_dir="./data"):
+             split=None, alpha=None, num_workers=4, seed=0, data_dir="./data"):
     
     # Choose dataset based on the provided name
     if dataset_name.lower() == "cifar10":
@@ -52,9 +53,9 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         num_classes = 9
     elif dataset_name.lower() == "dermamnist":
         with contextlib.redirect_stdout(None):
-            train_dataset = Dermamnist(root=data_dir, train=True, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
+            train_dataset = DermaMNIST(root=data_dir, train=True, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
         with contextlib.redirect_stdout(None):
-            test_dataset = Dermamnist(root=data_dir, train=False, split="test", download=True, transform=get_transforms(dataset_name, augmentation=False))
+            test_dataset = DermaMNIST(root=data_dir, train=False, split="test", download=True, transform=get_transforms(dataset_name, augmentation=False))
         num_classes = 7
     else:
         raise ValueError(f"Dataset {dataset_name} is not supported.")
@@ -65,10 +66,27 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         num_samples = len(test_dataset)
         return eval_loader, num_classes, num_samples
     else:
-        # Split data into client-specific subsets
-        train_indices = split_fn(idxs=train_dataset.targets, num_shards=num_clients,
-                                 num_samples=len(train_dataset), num_classes=num_classes, seed=seed)[int(id)]
-        train_dataset = torch.utils.data.Subset(train_dataset, train_indices)
+        if split == "dir_balance":
+            # Call dir_balance function
+            clients_data, sample = dir_balance(
+                dataset=train_dataset,
+                dataset_name=dataset_name,
+                num_classes=num_classes,
+                num_users=num_clients,
+                alpha=alpha,
+                data_dir=data_dir,
+                sample=None
+            )
+            # Get the train indices for the specific client
+            train_indices = clients_data[int(id)]
+            # Create a subset of the train dataset for the client
+            train_dataset = torch.utils.data.Subset(train_dataset, train_indices)
+        else:
+            split_fn = get_split_fn(split)
+            # Split data into client-specific subsets
+            train_indices = split_fn(idxs=train_dataset.targets, num_shards=num_clients,
+                                    num_samples=len(train_dataset), num_classes=num_classes, seed=seed)[int(id)]
+            train_dataset = torch.utils.data.Subset(train_dataset, train_indices)
 
         train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
         num_samples = len(train_indices)

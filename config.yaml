@@ -5,6 +5,7 @@ experiments:
     data_split: "iid"
     participation: 1.0
     max_parallel_executions: 6
+    skewness_alpha: 0.1
 
   # - dataset: "cifar10"
   #   num_rounds: 100
@@ -12,6 +13,7 @@ experiments:
   #   data_split: "iid"
   #   participation: 1.0
   #   max_parallel_executions: 6
+  #   skewness_alpha: 0.1
 
   # - dataset: "cifar10"
   #   num_rounds: 100
@@ -19,6 +21,7 @@ experiments:
   #   data_split: "iid"
   #   participation: 1.0
   #   max_parallel_executions: 6
+  #   skewness_alpha: 0.1
 
   # - dataset: "cifar10"
   #   num_rounds: 100
@@ -26,3 +29,4 @@ experiments:
   #   data_split: "iid"
   #   participation: 1.0
   #   max_parallel_executions: 6
+  #   skewness_alpha: 0.1

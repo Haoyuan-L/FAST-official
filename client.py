@@ -2,6 +2,7 @@ import flwr as fl
 import torch
 import collections
 import torchmetrics
+import torch.optim as optim 
 
 class Client(fl.client.NumPyClient):
 

@@ -179,23 +179,7 @@ def get_split_fn(name='iid', **split_fn_kwargs):
     elif name == 'imbalanced':
         return create_imbalanced_shards
     elif name == 'dir_balance':
-        def dir_balance_wrapper(idxs, num_shards, num_samples, num_classes, seed):
-            dataset = split_fn_kwargs['dataset']
-            dataset_name = split_fn_kwargs['dataset_name']
-            alpha = split_fn_kwargs.get('alpha', 1.0)
-            data_dir = split_fn_kwargs.get('data_dir', './')
-            sample = split_fn_kwargs.get('sample', None)
-            clients_data, _ = dir_balance(
-                dataset=dataset,
-                dataset_name=dataset_name,
-                num_classes=num_classes,
-                num_users=num_shards,
-                alpha=alpha,
-                data_dir=data_dir,
-                sample=sample
-            )
-            return clients_data
-        return dir_balance_wrapper
+        return ...
     else:
         raise ValueError("Invalid name provided. Supported names are 'iid', 'noniid', 'imbalanced', and 'dir_balance'.")
 

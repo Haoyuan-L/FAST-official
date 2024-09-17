@@ -17,21 +17,22 @@ warnings.simplefilter("ignore")
 from utils import *
 from args import args_parser
 import network
-import data
+from data import get_data
 from client import Client
 from server import Server
 
 def run_experiment(num_rounds=120, num_clients=20, participation=1.0, data_split='iid', max_parallel_executions=5,
-                   timeout=1500, init_model=None, dataset="cifar10"):
+                   timeout=1500, init_model=None, dataset="cifar10", skewness_alpha=None):
 
     def create_client(cid):
         time.sleep(int(cid) * 0.75)
         return Client(int(cid), num_clients=num_clients, model_loader=network.get_network,
-                      data_loader=lambda: get_data(dataset_name=dataset, id=cid, num_clients=num_clients, split_fn=get_split_fn(data_split)))
+                      data_loader=lambda: get_data(dataset_name=dataset, id=cid, num_clients=num_clients, split=data_split, alpha=skewness_alpha))
 
     def create_server(init_model=None):
         return Server(num_rounds=num_rounds, num_clients=num_clients, participation=participation,
-                      model_loader=network.get_network, data_loader=lambda: get_data(dataset_name=dataset, split_fn=get_split_fn(data_split)), 
+                      model_loader=network.get_network, 
+                      data_loader=lambda: get_data(dataset_name=dataset, split=data_split, alpha=skewness_alpha, return_eval_ds=True), 
                       init_model=init_model)
 
     server = create_server()
@@ -54,7 +55,8 @@ def run_with_different_configs(yaml_config_file):
         # Run the experiment with current configuration
         history = run_experiment(num_rounds=config["num_rounds"], num_clients=config["num_clients"],
                                  data_split=config["data_split"], participation=config["participation"],
-                                 max_parallel_executions=config["max_parallel_executions"])
+                                 max_parallel_executions=config["max_parallel_executions"], dataset=config["dataset"],
+                                 skewness_alpha=config["skewness_alpha"])
 
         # Log the results of the experiment
         log_results(history, config)
