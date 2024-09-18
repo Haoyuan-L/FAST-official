@@ -6,9 +6,9 @@ import torch.optim as optim
 
 class Client(fl.client.NumPyClient):
 
-	def __init__(self, cid, num_clients, model_loader, data_loader, split_fn=None, device='cuda'):
+	def __init__(self, cid, model_loader, data_loader, device='cuda'):
 		self.cid = cid
-		self.data, self.num_classes, self.num_samples = data_loader(id=cid, num_clients=num_clients, split_fn=split_fn)
+		self.data, self.num_classes, self.num_samples = data_loader()
 		self.model_loader = model_loader
 		self.device = device
 
