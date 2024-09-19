@@ -119,7 +119,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         selected_indices = np.random.choice(class_indices, num_per_class, replace=False)
         labeled_indices.extend(selected_indices)
     labeled_indices = labeled_indices[:num_labeled_samples]
-    all_indices = np.range(total_samples)
+    all_indices = set(range(total_samples))
     unlabeled_indices = list(all_indices - set(labeled_indices))
 
     labeled_subset = torch.utils.data.Subset(train_dataset_for_embeddings, labeled_indices)
