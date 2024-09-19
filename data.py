@@ -6,7 +6,9 @@ from torchvision.datasets import CIFAR10, SVHN
 import torchvision.transforms as transforms
 import numpy as np
 from utils import *
-
+import open_clip
+import faiss
+from collections import Counter
 
 def get_transforms(dataset_name, augmentation=True):
     """Returns the appropriate transformations based on the dataset name."""
@@ -28,13 +30,50 @@ def get_transforms(dataset_name, augmentation=True):
 
     return transforms.Compose(data_transform)
 
+def get_embeddings(dataset, model, device, batch_size=64):
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    embeddings = []
+    labels = []
+    with torch.no_grad():
+        for images, targets in dataloader:
+            images = images.to(device)
+            # Obtain image embeddings
+            features = model.encode_image(images)
+            embeddings.append(features.cpu())
+            labels.extend(targets.numpy())
+    embeddings = torch.cat(embeddings)
+    labels = np.array(labels)
+    return embeddings, labels
+
+# Calculate logit (probability distribution over classes)
+def get_logits_from_knn(k, indices, labeled_labels, num_classes):
+    logits = []
+    for neighbor_indices in indices:
+        # Get the labels of the k-nearest neighbors
+        neighbor_labels = labeled_labels[neighbor_indices]
+        # Count occurrences of each label
+        label_count = Counter(neighbor_labels)
+        # Create a probability distribution (logit format) over all classes
+        logit = np.zeros(num_classes)
+        for label, count in label_count.items():
+            logit[label] = count / k  # Fraction of neighbors that belong to the class
+        logits.append(logit)
+    return np.array(logits)
+
 def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, 
              split=None, alpha=None, num_workers=4, seed=0, data_dir="./data"):
     
+    # load the OpenCLIP model
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16-SigLIP-512', 'webli')
+    model.to(device)
+    model.eval()
+
     # Choose dataset based on the provided name
     if dataset_name.lower() == "cifar10":
         with contextlib.redirect_stdout(None):
             train_dataset = CIFAR10(root=data_dir, train=True, download=True, transform=get_transforms(dataset_name, augmentation=True))
+            train_dataset_for_embeddings = CIFAR10(root=data_dir, train=True, download=True, transform=preprocess)
         with contextlib.redirect_stdout(None):
             test_dataset = CIFAR10(root=data_dir, train=False, download=True, transform=get_transforms(dataset_name, augmentation=False))
         num_classes = 10
@@ -42,23 +81,74 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     elif dataset_name.lower() == "svhn":
         with contextlib.redirect_stdout(None):
             train_dataset = SVHN(root=data_dir, split='train', download=True, transform=get_transforms(dataset_name, augmentation=True))
+            train_dataset_for_embeddings = SVHN(root=data_dir, split='train', download=True, transform=preprocess)
         with contextlib.redirect_stdout(None):
             test_dataset = SVHN(root=data_dir, split='test', download=True, transform=get_transforms(dataset_name, augmentation=False))
         num_classes = 10
+
     elif dataset_name.lower() == "pathmnist":
         with contextlib.redirect_stdout(None):
             train_dataset = PathMNIST(root=data_dir, train=True, download=True, transform=get_transforms(dataset_name, augmentation=True))
+            train_dataset_for_embeddings = PathMNIST(root=data_dir, train=True, download=True, transform=preprocess)
         with contextlib.redirect_stdout(None):
             test_dataset = PathMNIST(root=data_dir, train=False, download=True, transform=get_transforms(dataset_name, augmentation=False))
         num_classes = 9
+
     elif dataset_name.lower() == "dermamnist":
         with contextlib.redirect_stdout(None):
             train_dataset = DermaMNIST(root=data_dir, train=True, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
+            train_dataset_for_embeddings = DermaMNIST(root=data_dir, train=True, split="train", download=True, transform=preprocess)
         with contextlib.redirect_stdout(None):
             test_dataset = DermaMNIST(root=data_dir, train=False, split="test", download=True, transform=get_transforms(dataset_name, augmentation=False))
         num_classes = 7
     else:
         raise ValueError(f"Dataset {dataset_name} is not supported.")
+
+    # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
+    initial_labeled_ratio = 0.01
+    np.random.seed(6)
+    total_samples = len(train_dataset)
+    num_labeled_samples = int(total_samples * initial_labeled_ratio)
+    num_per_class = num_labeled_samples // num_classes
+    
+    labels = np.array(train_dataset.targets)
+    indices_per_class = {i: np.where(labels == i)[0] for i in range(num_classes)}
+    labeled_indices = []
+    for idx in range(num_classes):
+        class_indices = indices_per_class[idx]
+        selected_indices = np.random.choice(class_indices, num_per_class, replace=False)
+        labeled_indices.extend(selected_indices)
+    labeled_indices = labeled_indices[:num_labeled_samples]
+    all_indices = np.arange(total_samples)
+    unlabeled_indices = list(all_indices - set(labeled_indices))
+
+    labeled_subset = torch.utils.data.Subset(train_dataset_for_embeddings, labeled_indices)
+    unlabeled_subset = torch.utils.data.Subset(train_dataset_for_embeddings, unlabeled_indices)
+
+    # Utilize SIGLIP encoder to encode all the training data
+    labeled_embeddings, labeled_labels = get_embeddings(labeled_subset, model, device, batch_size)
+    unlabeled_embeddings, unlabled_ground_truth = get_embeddings(unlabeled_subset, model, device, batch_size)
+
+    # Apply FAISS-KNN to embedings for data labeling
+    labeled_embeddings = labeled_embeddings.numpy().astype('float32')
+    unlabeled_embeddings = unlabeled_embeddings.numpy().astype('float32')
+
+    index = faiss.IndexFlatL2(labeled_embeddings.shape[1])
+    index.add(labeled_embeddings)
+    k = 10
+    distances, indices = index.search(unlabeled_embeddings, k)
+    logits = get_logits_from_knn(k, indices, labeled_labels, num_classes)
+    predicted_labels = np.array(np.argmax(logits, axis=1))
+    unlabeled_ground_truth = np.array(unlabled_ground_truth)
+    corrects = np.sum(predicted_labels == unlabeled_ground_truth)
+    labeling_acc = corrects / len(unlabeled_ground_truth)
+    print(f"Labeling Accuracy: {labeling_acc * 100:.2f}%")
+
+    all_labels = np.zeros(len(train_dataset), dtype=int)
+    all_labels[labeled_indices] = labeled_labels
+    all_labels[unlabeled_indices] = predicted_labels
+
+    # select the most uncertain samples for manual labeling (Oracle)
 
     # Return evaluation dataset if required
     if return_eval_ds:
