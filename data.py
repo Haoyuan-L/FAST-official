@@ -9,6 +9,7 @@ from utils import *
 import open_clip
 import faiss
 from collections import Counter
+import time
 
 def get_transforms(dataset_name, augmentation=True):
     """Returns the appropriate transformations based on the dataset name."""
@@ -60,6 +61,12 @@ def get_logits_from_knn(k, indices, labeled_labels, num_classes):
         logits.append(logit)
     return np.array(logits)
 
+def compute_entropy(logits):
+    probs = logits / np.sum(logits, axis=1, keepdims=True)
+    # Compute entropy for each sample
+    entropy = -np.sum(probs * np.log(probs + 1e-12), axis=1)
+    return entropy
+
 def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, 
              split=None, alpha=None, num_workers=4, seed=0, data_dir="./data"):
     
@@ -104,6 +111,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     else:
         raise ValueError(f"Dataset {dataset_name} is not supported.")
 
+    start_time = time.time()
     # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
     initial_labeled_ratio = 0.01
     np.random.seed(6)
@@ -149,6 +157,26 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     all_labels[unlabeled_indices] = predicted_labels
 
     # select the most uncertain samples for manual labeling (Oracle)
+    qeury_ratio = 0.05
+    entropy = compute_entropy(logits)
+    num_query_samples = int(qeury_ratio * len(unlabeled_indices))
+    uncertainty_order = np.argsort(-entropy)
+    uncertain_indices = uncertainty_order[:num_query_samples]
+    uncertain_sample_indices = np.array(unlabeled_indices)[uncertain_indices]
+    oracle_annotation_labels = unlabeled_ground_truth[uncertain_indices]
+    all_labels[uncertain_sample_indices] = oracle_annotation_labels
+
+    # labeling accuracy after first AL round
+    updated_unlabeled_labels = all_labels[unlabeled_indices]
+    corrects = np.sum(updated_unlabeled_labels == unlabeled_ground_truth)
+    new_labeling_acc = corrects / len(unlabeled_ground_truth)
+    print(f"Labeling Accuracy after first AL round: {new_labeling_acc * 100:.2f}%")
+
+    end_time = time.time()
+    # Calculate and print the time cost
+    time_cost = end_time - start_time
+    print(f"Time cost: {time_cost:.6f} seconds")
+    raise KeyboardInterrupt
 
     # Return evaluation dataset if required
     if return_eval_ds:
