@@ -110,74 +110,72 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         num_classes = 7
     else:
         raise ValueError(f"Dataset {dataset_name} is not supported.")
+ 
+    if os.path.exists(f"{dataset_name}_labels.npy"):
+        all_labels = np.load(f"{dataset_name}_labeled_indices.npy")
+    else:
+        # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
+        initial_labeled_ratio = 0.01
+        np.random.seed(6)
+        total_samples = len(train_dataset)
+        num_labeled_samples = int(total_samples * initial_labeled_ratio)
+        num_per_class = num_labeled_samples // num_classes
+        
+        labels = np.array(train_dataset.targets)
+        indices_per_class = {i: np.where(labels == i)[0] for i in range(num_classes)}
+        labeled_indices = []
+        for idx in range(num_classes):
+            class_indices = indices_per_class[idx]
+            selected_indices = np.random.choice(class_indices, num_per_class, replace=False)
+            labeled_indices.extend(selected_indices)
+        labeled_indices = labeled_indices[:num_labeled_samples]
+        all_indices = set(range(total_samples))
+        unlabeled_indices = list(all_indices - set(labeled_indices))
 
-    start_time = time.time()
-    # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
-    initial_labeled_ratio = 0.01
-    np.random.seed(6)
-    total_samples = len(train_dataset)
-    num_labeled_samples = int(total_samples * initial_labeled_ratio)
-    num_per_class = num_labeled_samples // num_classes
+        labeled_subset = torch.utils.data.Subset(train_dataset_for_embeddings, labeled_indices)
+        unlabeled_subset = torch.utils.data.Subset(train_dataset_for_embeddings, unlabeled_indices)
+
+        # Utilize SIGLIP encoder to encode all the training data
+        labeled_embeddings, labeled_labels = get_embeddings(labeled_subset, model, device, batch_size)
+        unlabeled_embeddings, unlabled_ground_truth = get_embeddings(unlabeled_subset, model, device, batch_size)
+
+        # Apply FAISS-KNN to embedings for data labeling
+        labeled_embeddings = labeled_embeddings.numpy().astype('float32')
+        unlabeled_embeddings = unlabeled_embeddings.numpy().astype('float32')
+
+        index = faiss.IndexFlatL2(labeled_embeddings.shape[1])
+        index.add(labeled_embeddings)
+        k = 10
+        distances, indices = index.search(unlabeled_embeddings, k)
+        logits = get_logits_from_knn(k, indices, labeled_labels, num_classes)
+        predicted_labels = np.array(np.argmax(logits, axis=1))
+        unlabeled_ground_truth = np.array(unlabled_ground_truth)
+        corrects = np.sum(predicted_labels == unlabeled_ground_truth)
+        labeling_acc = corrects / len(unlabeled_ground_truth)
+        print(f"Labeling Accuracy: {labeling_acc * 100:.2f}%")
+
+        all_labels = np.zeros(len(train_dataset), dtype=int)
+        all_labels[labeled_indices] = labeled_labels
+        all_labels[unlabeled_indices] = predicted_labels
+
+        # select the most uncertain samples for manual labeling (Oracle)
+        query_ratio = 0.05
+        entropy = compute_entropy(logits)
+        num_query_samples = int(query_ratio * len(unlabeled_indices))
+        uncertainty_order = np.argsort(-entropy)
+        uncertain_indices = uncertainty_order[:num_query_samples]
+        uncertain_sample_indices = np.array(unlabeled_indices)[uncertain_indices]
+        oracle_annotation_labels = unlabeled_ground_truth[uncertain_indices]
+        all_labels[uncertain_sample_indices] = oracle_annotation_labels
+        np.save(f"{dataset_name}_labels.npy", all_labels)
+
+        # labeling accuracy after first AL round
+        updated_unlabeled_labels = all_labels[unlabeled_indices]
+        corrects = np.sum(updated_unlabeled_labels == unlabeled_ground_truth)
+        new_labeling_acc = corrects / len(unlabeled_ground_truth)
+        print(f"Labeling Accuracy after first AL round: {new_labeling_acc * 100:.2f}%")
     
-    labels = np.array(train_dataset.targets)
-    indices_per_class = {i: np.where(labels == i)[0] for i in range(num_classes)}
-    labeled_indices = []
-    for idx in range(num_classes):
-        class_indices = indices_per_class[idx]
-        selected_indices = np.random.choice(class_indices, num_per_class, replace=False)
-        labeled_indices.extend(selected_indices)
-    labeled_indices = labeled_indices[:num_labeled_samples]
-    all_indices = set(range(total_samples))
-    unlabeled_indices = list(all_indices - set(labeled_indices))
-
-    labeled_subset = torch.utils.data.Subset(train_dataset_for_embeddings, labeled_indices)
-    unlabeled_subset = torch.utils.data.Subset(train_dataset_for_embeddings, unlabeled_indices)
-
-    # Utilize SIGLIP encoder to encode all the training data
-    labeled_embeddings, labeled_labels = get_embeddings(labeled_subset, model, device, batch_size)
-    unlabeled_embeddings, unlabled_ground_truth = get_embeddings(unlabeled_subset, model, device, batch_size)
-
-    # Apply FAISS-KNN to embedings for data labeling
-    labeled_embeddings = labeled_embeddings.numpy().astype('float32')
-    unlabeled_embeddings = unlabeled_embeddings.numpy().astype('float32')
-
-    index = faiss.IndexFlatL2(labeled_embeddings.shape[1])
-    index.add(labeled_embeddings)
-    k = 10
-    distances, indices = index.search(unlabeled_embeddings, k)
-    logits = get_logits_from_knn(k, indices, labeled_labels, num_classes)
-    predicted_labels = np.array(np.argmax(logits, axis=1))
-    unlabeled_ground_truth = np.array(unlabled_ground_truth)
-    corrects = np.sum(predicted_labels == unlabeled_ground_truth)
-    labeling_acc = corrects / len(unlabeled_ground_truth)
-    print(f"Labeling Accuracy: {labeling_acc * 100:.2f}%")
-
-    all_labels = np.zeros(len(train_dataset), dtype=int)
-    all_labels[labeled_indices] = labeled_labels
-    all_labels[unlabeled_indices] = predicted_labels
-
-    # select the most uncertain samples for manual labeling (Oracle)
-    qeury_ratio = 0.05
-    entropy = compute_entropy(logits)
-    num_query_samples = int(qeury_ratio * len(unlabeled_indices))
-    uncertainty_order = np.argsort(-entropy)
-    uncertain_indices = uncertainty_order[:num_query_samples]
-    uncertain_sample_indices = np.array(unlabeled_indices)[uncertain_indices]
-    oracle_annotation_labels = unlabeled_ground_truth[uncertain_indices]
-    all_labels[uncertain_sample_indices] = oracle_annotation_labels
-
-    # labeling accuracy after first AL round
-    updated_unlabeled_labels = all_labels[unlabeled_indices]
-    corrects = np.sum(updated_unlabeled_labels == unlabeled_ground_truth)
-    new_labeling_acc = corrects / len(unlabeled_ground_truth)
-    print(f"Labeling Accuracy after first AL round: {new_labeling_acc * 100:.2f}%")
-
-    end_time = time.time()
-    # Calculate and print the time cost
-    time_cost = end_time - start_time
-    print(f"Time cost: {time_cost:.6f} seconds")
-    raise KeyboardInterrupt
-
+    train_dataset.targets = all_labels.tolist()
     # Return evaluation dataset if required
     if return_eval_ds:
         eval_loader = DataLoader(test_dataset, batch_size=batch_size * 4, shuffle=False, num_workers=num_workers)
