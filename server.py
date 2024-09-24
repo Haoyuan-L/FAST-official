@@ -3,6 +3,7 @@ import flwr as fl
 import torch
 import collections
 import torchmetrics
+from strategy import *
 
 class Server(fl.server.Server):
 
@@ -26,11 +27,17 @@ class Server(fl.server.Server):
 		return super(Server, self).set_max_workers(*args, **kwargs)
 
 	def set_strategy(self, *_):
-		self.strategy = fl.server.strategy.FedAvg(
-			min_available_clients=self.num_clients, fraction_fit=self.participation,
-			min_fit_clients=int(self.participation*self.num_clients), fraction_evaluate=0.0,
-			min_evaluate_clients=0, evaluate_fn=self.get_evaluation_fn(),
-			on_fit_config_fn=self.get_client_config_fn(), initial_parameters=self.get_initial_parameters(),)
+		self.strategy = CustomFedAvg(
+            fraction_fit=self.participation,
+            min_fit_clients=int(self.participation * self.num_clients),
+            min_available_clients=self.num_clients,
+            on_fit_config_fn=self.get_client_config_fn(),
+            initial_parameters=self.get_initial_parameters(),
+            model_loader=self.model_loader,
+            data_loader=self.data_loader,
+            num_classes=self.num_classes,
+            device=self.device,
+        )
 
 	def client_manager(self, *args, **kwargs):
 		return super(Server, self).client_manager(*args, **kwargs)
