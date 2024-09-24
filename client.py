@@ -36,7 +36,7 @@ class Client(fl.client.NumPyClient):
 
 	@staticmethod
 	def train(ds, model, epochs, optimizer, num_classes, metrics=None, loss=torch.nn.CrossEntropyLoss(), verbose=False):
-		device = next(model.parameters()).device
+		#device = next(model.parameters()).device
 		if metrics is None:
 			metrics = torchmetrics.classification.MulticlassAccuracy(num_classes=num_classes, average='micro').to(device)
 		loss_scores = []
