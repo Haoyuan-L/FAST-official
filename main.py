@@ -79,8 +79,6 @@ def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split
 
 
 def run_with_different_configs(yaml_config_file):
-    random.seed(42)
-    np.random.seed(42)
 
     # Load configurations from YAML file
     with open(yaml_config_file, 'r') as file:
@@ -88,6 +86,10 @@ def run_with_different_configs(yaml_config_file):
 
     # Loop through each experiment configuration
     for config in configs['experiments']:
+        # Set the seed for reproducibility
+        torch.manual_seed(configs["seed"])
+        torch.cuda.manual_seed(configs["seed"])
+        np.random.seed(configs["seed"])
         # Run the experiment with current configuration
         history = run_experiment(num_rounds=config["num_rounds"], num_clients=config["num_clients"],
                                  data_split=config["data_split"], participation=config["participation"],

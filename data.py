@@ -116,7 +116,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     else:
         # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
         initial_labeled_ratio = 0.01
-        np.random.seed(6)
+        np.random.seed(1)
         total_samples = len(train_dataset)
         num_labeled_samples = int(total_samples * initial_labeled_ratio)
         num_per_class = num_labeled_samples // num_classes
