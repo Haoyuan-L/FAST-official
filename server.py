@@ -11,6 +11,7 @@ class Server(fl.server.Server):
 		participation=1.0, init_model=None, log_level=logging.INFO):
 
 		self.num_rounds = num_rounds
+		self.data_loader = data_loader
 		self.data, self.num_classes, self.num_samples = data_loader()
 		self.model_loader = model_loader
 		self.init_model = init_model
