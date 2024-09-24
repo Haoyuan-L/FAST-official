@@ -21,7 +21,7 @@ class Server(fl.server.Server):
 		self.set_strategy(self)
 		self._client_manager = fl.server.client_manager.SimpleClientManager()
 		self.max_workers = None
-		self.device = 'cuda'
+		self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 		logging.getLogger("flower").setLevel(log_level)
 
 	def set_max_workers(self, *args, **kwargs):
