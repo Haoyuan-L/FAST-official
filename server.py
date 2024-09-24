@@ -38,6 +38,7 @@ class Server(fl.server.Server):
             data_loader=self.data_loader,
             num_classes=self.num_classes,
             device=self.device,
+			evaluate_fn=self.get_evaluation_fn()
         )
 
 	def client_manager(self, *args, **kwargs):
