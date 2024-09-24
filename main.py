@@ -27,7 +27,7 @@ def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split
 
     def create_client(cid):
         time.sleep(int(cid) * 0.75)
-        return Client(int(cid), model_loader=network.get_resnet18_network,
+        return Client(int(cid), model_loader=network.get_cnn4_network,
                       data_loader=lambda: get_data(dataset_name=dataset, id=cid, num_clients=num_clients, split=data_split, alpha=skewness_alpha))
 
     def create_server(init_model=None):
