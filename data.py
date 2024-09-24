@@ -112,7 +112,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         raise ValueError(f"Dataset {dataset_name} is not supported.")
  
     if os.path.exists(f"{dataset_name}_labels.npy"):
-        all_labels = np.load(f"{dataset_name}_labeled_indices.npy")
+        all_labels = np.load(f"{dataset_name}_labels.npy")
     else:
         # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
         initial_labeled_ratio = 0.01
