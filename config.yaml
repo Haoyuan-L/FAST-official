@@ -2,7 +2,7 @@ experiments:
   - dataset: "cifar10"
     num_rounds: 100
     num_clients: 10
-    data_split: "iid"
+    data_split: "dir_balance"
     participation: 1.0
     max_parallel_executions: 6
     skewness_alpha: 0.1
