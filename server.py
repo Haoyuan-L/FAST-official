@@ -18,10 +18,10 @@ class Server(fl.server.Server):
 		self.clients_config = {"epochs":1, "lr":1e-3}
 		self.num_clients = num_clients
 		self.participation = participation
-		self.set_strategy(self)
+		self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 		self._client_manager = fl.server.client_manager.SimpleClientManager()
 		self.max_workers = None
-		self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+		self.set_strategy(self)
 		logging.getLogger("flower").setLevel(log_level)
 
 	def set_max_workers(self, *args, **kwargs):
