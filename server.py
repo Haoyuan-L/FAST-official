@@ -31,7 +31,8 @@ class Server(fl.server.Server):
 		self.strategy = fl.server.strategy.FedAvg(
 			min_available_clients=self.num_clients, fraction_fit=self.participation,
 			min_fit_clients=int(self.participation*self.num_clients), fraction_evaluate=0.0,
-			min_evaluate_clients=0,	on_fit_config_fn=self.get_client_config_fn(), initial_parameters=self.get_initial_parameters(),)
+			min_evaluate_clients=0, evaluate_fn=self.get_evaluation_fn(),
+			on_fit_config_fn=self.get_client_config_fn(), initial_parameters=self.get_initial_parameters(),)
 
 	def client_manager(self, *args, **kwargs):
 		return super(Server, self).client_manager(*args, **kwargs)
