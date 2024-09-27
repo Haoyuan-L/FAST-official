@@ -195,21 +195,21 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
 
         # load uncertainty method
         if uncertainty == "norm":
-            uncertainty = compute_norm(logits)
+            uncertainty_func = compute_norm(logits)
         elif uncertainty == "entropy":
-            uncertainty = compute_entropy(logits)
+            uncertainty_func = compute_entropy(logits)
         elif uncertainty == "least_confidence":
-            uncertainty = compute_least_confidence(logits)
+            uncertainty_func = compute_least_confidence(logits)
         elif uncertainty == "smallest_margin":
-            uncertainty = compute_smallest_margin(logits)
+            uncertainty_func = compute_smallest_margin(logits)
         elif uncertainty == "largest_margin":
-            uncertainty = compute_largest_margin(logits)
+            uncertainty_func = compute_largest_margin(logits)
         else:
             raise ValueError(f"Unknown uncertainty method: {uncertainty}")
 
         # select the most uncertain samples for manual labeling (Oracle)
         query_ratio = 0.05
-        uncertainty_score = uncertainty(logits)
+        uncertainty_score = uncertainty_func(logits)
         num_query_samples = int(query_ratio * len(unlabeled_indices))
         class_aware = True  # Set this to False for class-agnostic sampling
 
