@@ -39,32 +39,36 @@ def compute_entropy(logits):
     return entropy
 
 def compute_norm(logits):
-    predicted_labels = torch.argmax(logits, dim=1)
-    # Create one-hot encoded predicted labels
-    one_hot_predicted = F.one_hot(predicted_labels, num_classes=logits.size(1)).float()
-    # Compute L2 norm between probabilities and one-hot labels
-    uncertainty = torch.norm(logits - one_hot_predicted, dim=1)
+    predicted_labels = np.argmax(logits, axis=1) 
+    # One-hot encode the predicted labels
+    one_hot_predicted = np.zeros_like(logits) 
+    one_hot_predicted[np.arange(len(predicted_labels)), predicted_labels] = 1.0
+    # Compute L2 norm between logits and one-hot encoded predictions
+    uncertainty = np.linalg.norm(logits - one_hot_predicted, axis=1) 
     return uncertainty
 
 def compute_least_confidence(logits):
-    uncertainty = 1.0 - torch.max(logits, dim=1)[0]
+    max_probs = np.max(logits, axis=1)
+    # Least confidence uncertainty
+    uncertainty = 1.0 - max_probs
     return uncertainty
 
 def compute_smallest_margin(logits):
     # Sort logits in descending order
-    sorted_logits, _ = torch.sort(logits, dim=1, descending=True)
-    # Compute margin between top two probabilities
+    sorted_logits = np.sort(logits, axis=1)[:, ::-1]  
     margin = sorted_logits[:, 0] - sorted_logits[:, 1]
-    # Compute uncertainty
+    # Smallest margin uncertainty
     uncertainty = 1.0 - margin
     return uncertainty
 
 def compute_largest_margin(logits):
-    # Compute maximum and minimum logits
-    max_logits, _ = torch.max(logits, dim=1)
-    min_logits, _ = torch.min(logits, dim=1)
+    # Maximum and minimum logits per sample
+    max_logits = np.max(logits, axis=1)
+    min_logits = np.min(logits, axis=1)
+
     # Compute margin
     margin = max_logits - min_logits
+    # Largest margin uncertainty
     uncertainty = 1.0 - margin
     return uncertainty
 
