@@ -195,15 +195,15 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
 
         # load uncertainty method
         if uncertainty == "norm":
-            uncertainty_func = compute_norm(logits)
+            uncertainty_func = compute_norm
         elif uncertainty == "entropy":
-            uncertainty_func = compute_entropy(logits)
+            uncertainty_func = compute_entropy
         elif uncertainty == "least_confidence":
-            uncertainty_func = compute_least_confidence(logits)
+            uncertainty_func = compute_least_confidence
         elif uncertainty == "smallest_margin":
-            uncertainty_func = compute_smallest_margin(logits)
+            uncertainty_func = compute_smallest_margin
         elif uncertainty == "largest_margin":
-            uncertainty_func = compute_largest_margin(logits)
+            uncertainty_func = compute_largest_margin
         else:
             raise ValueError(f"Unknown uncertainty method: {uncertainty}")
 
