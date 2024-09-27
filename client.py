@@ -25,7 +25,8 @@ class Client(fl.client.NumPyClient):
 	def fit(self, parameters, config):
 		self.set_parameters(parameters, config)
 		# SGD optimizer
-		optimizer = optim.SGD(self.model.parameters(), lr=1e-2, momentum=0.9, weight_decay=1e-4)
+		lr = config.get('lr', 1e-3) 
+		optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
 		# Adam optimizer
 		#optimizer = torch.optim.Adam(self.model.parameters(), lr=config['lr'])
 		h = __class__.train(ds=self.data, model=self.model, epochs=config['epochs'], optimizer=optimizer, num_classes=self.num_classes)

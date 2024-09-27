@@ -183,16 +183,17 @@ def get_split_fn(name='iid', **split_fn_kwargs):
     else:
         raise ValueError("Invalid name provided. Supported names are 'iid', 'noniid', 'imbalanced', and 'dir_balance'.")
 
-def adjust_learning_rate(lr, rnd, lr_decay, r):
-    lr = lr
-    iterations = [int(rnd * 3 / 4)]
+import math
+
+def get_learning_rate(initial_lr, current_round, total_rounds, decay_factor=0.5, num_decays=3):
+    """
+    Step-wise decay of learning rate.
+    """
+    # Determine the number of decays that should have occurred by the current round
+    decay_step = total_rounds / (num_decays + 1)  # +1 to include the initial LR at round 0
+    num_applied_decays = int(current_round / decay_step)
     
-    lr_decay_epochs = []
-    for it in iterations:
-        lr_decay_epochs.append(int(it))
-        
-    steps = np.sum(r > np.asarray(lr_decay_epochs))
-    if steps > 0:
-        lr = lr * (lr_decay ** steps)
-        
-    return lr
+    # Calculate the new learning rate
+    new_lr = initial_lr * (decay_factor ** num_applied_decays)
+    
+    return new_lr

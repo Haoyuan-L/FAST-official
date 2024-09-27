@@ -4,18 +4,23 @@ import torch
 import collections
 import torchmetrics
 from strategy import *
+from utils import get_learning_rate
 
 class Server(fl.server.Server):
 
 	def __init__(self, model_loader, data_loader, num_rounds, num_clients=10,
-		participation=1.0, init_model=None, log_level=logging.INFO):
+		participation=1.0, init_model=None, log_level=logging.INFO,
+		initial_lr=1e-3, decay_factor=0.1, num_decays=3):
 
 		self.num_rounds = num_rounds
 		self.data_loader = data_loader
 		self.data, self.num_classes, self.num_samples = data_loader()
 		self.model_loader = model_loader
 		self.init_model = init_model
-		self.clients_config = {"epochs":1, "lr":1e-3}
+		self.initial_lr = initial_lr
+		self.decay_factor = decay_factor
+		self.num_decays = num_decays
+		self.clients_config = {"epochs":5, "lr":initial_lr}
 		self.num_clients = num_clients
 		self.participation = participation
 		self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -61,6 +66,27 @@ class Server(fl.server.Server):
 			metrics = __class__.evaluate(model=self.model, ds=self.data, num_classes=self.num_classes)
 			return metrics[0], {"accuracy":metrics[1]}
 		return evaluation_fn
+
+	def get_client_config_fn(self):
+		"""Define fit config function with dynamic learning rate based on round."""
+		def config_fn(rnd):
+            # Calculate the learning rate based on the current round
+			current_lr = get_learning_rate(
+                initial_lr=self.initial_lr,
+				current_round=rnd,
+                total_rounds=self.num_rounds,
+                decay_factor=self.decay_factor,
+                num_decays=self.num_decays
+            )
+            # Update the clients' configuration
+			client_config = {
+				"epochs": 5,
+                "lr": current_lr,
+                "round": rnd
+            }
+			logging.info(f"Round {rnd}: Setting client learning rate to {current_lr}")
+			return client_config
+		return config_fn
 
 	def get_client_config_fn(self):
 		" Define fit config function with constant self objects."
