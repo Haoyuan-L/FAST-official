@@ -98,11 +98,12 @@ def run_with_different_configs(yaml_config_file):
                                  skewness_alpha=config["skewness_alpha"], class_aware=config["class_aware"], uncertainty=config["uncertainty"])
 
         # Log the results of the experiment
-        log_results(history, config)
+        fname = config["dataset"]+ "_" + config["data_split"] + "_" + config["uncertainty"] + "_" + "class_aware-" + config["class_aware"]
+        log_results(history, config, fname)
 
 
 def log_results(history, config):
-    with open("exp_log.txt", "a") as file:
+    with open(fname, "a") as file:
         file.write(f"Config: {config}\n")
         file.write(f"History: {history}\n")
         file.write("---------------------------\n")
