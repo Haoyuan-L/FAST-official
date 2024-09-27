@@ -96,8 +96,7 @@ def get_logits_from_knn(k, indices, labeled_labels, num_classes):
         for label, count in label_count.items():
             logit[label] = count / k  # Fraction of neighbors that belong to the class
         logits.append(logit)
-        logits_tensor = torch.from_numpy(np.array(logits)).float()
-    return logits_tensor
+    return np.array(logits)
 
 def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, 
              split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm"):
