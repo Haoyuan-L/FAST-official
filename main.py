@@ -36,7 +36,7 @@ def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split
                       model_loader=network.get_cnn4_network, 
                       data_loader=lambda: get_data(dataset_name=dataset, split=data_split, alpha=skewness_alpha, return_eval_ds=True), 
                       init_model=init_model)
-    
+    ray.shutdown()
     ray.init()
     total_resources = ray.cluster_resources()
     print("Total resources:", total_resources)
@@ -98,7 +98,7 @@ def run_with_different_configs(yaml_config_file):
                                  skewness_alpha=config["skewness_alpha"], class_aware=config["class_aware"], uncertainty=config["uncertainty"])
 
         # Log the results of the experiment
-        fname = config["dataset"]+ "_" + config["data_split"] + "_" + config["uncertainty"] + "_" + "class_aware-" + str(config["class_aware"])
+        fname = config["dataset"]+ "_" + config["data_split"] + "_" + config["uncertainty"] + "_" + "class_aware-" + str(config["class_aware"]) + ".log"
         log_results(history, config, fname)
 
 
