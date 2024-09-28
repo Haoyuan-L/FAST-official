@@ -102,7 +102,7 @@ def run_with_different_configs(yaml_config_file):
         log_results(history, config, fname)
 
 
-def log_results(history, config):
+def log_results(history, config, fname):
     with open(fname, "a") as file:
         file.write(f"Config: {config}\n")
         file.write(f"History: {history}\n")
