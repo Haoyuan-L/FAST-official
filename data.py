@@ -146,8 +146,8 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     else:
         raise ValueError(f"Dataset {dataset_name} is not supported.")
  
-    if os.path.exists(f"{dataset_name}_labels.npy"):
-        all_labels = np.load(f"{dataset_name}_labels.npy")
+    if os.path.exists(f"{dataset_name}_{uncertainty}_labels.npy"):
+        all_labels = np.load(f"{dataset_name}_{uncertainty}_labels.npy")
     else:
         # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
         initial_labeled_ratio = 0.01
@@ -253,7 +253,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             oracle_annotation_labels = unlabeled_ground_truth[uncertain_indices]
             all_labels[uncertain_sample_indices] = oracle_annotation_labels
 
-        np.save(f"{dataset_name}_labels.npy", all_labels)
+        np.save(f"{dataset_name}_{uncertainty}_labels.npy", all_labels)
 
         # labeling accuracy after first AL round
         updated_unlabeled_labels = all_labels[unlabeled_indices]
