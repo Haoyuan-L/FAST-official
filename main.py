@@ -98,7 +98,7 @@ def run_with_different_configs(yaml_config_file):
                                  skewness_alpha=config["skewness_alpha"], class_aware=config["class_aware"], uncertainty=config["uncertainty"])
 
         # Log the results of the experiment
-        fname = config["dataset"]+ "_" + config["data_split"] + "_" + config["uncertainty"] + "_" + "class_aware-" + config["class_aware"]
+        fname = config["dataset"]+ "_" + config["data_split"] + "_" + config["uncertainty"] + "_" + "class_aware-" + str(config["class_aware"])
         log_results(history, config, fname)
 
 
