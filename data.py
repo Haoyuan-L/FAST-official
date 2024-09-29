@@ -32,6 +32,29 @@ def get_transforms(dataset_name, augmentation=True):
 
     return transforms.Compose(data_transform)
 
+
+def extract_labels(dataset):
+    if hasattr(dataset, 'targets'):
+        labels = dataset.targets
+    elif hasattr(dataset, 'labels'):
+        labels = dataset.labels
+    elif hasattr(dataset, 'target'):
+        labels = dataset.target
+    elif hasattr(dataset, 'label'):
+        labels = dataset.label
+    else:
+        raise AttributeError("Dataset does not have a known attribute for labels")
+
+    if isinstance(labels, torch.Tensor):
+        labels = labels.numpy()
+    elif isinstance(labels, list):
+        labels = np.array(labels)
+    elif isinstance(labels, np.ndarray):
+        pass
+    else:
+        labels = np.array(labels)
+    return labels
+
 def compute_entropy(logits):
     probs = logits / np.sum(logits, axis=1, keepdims=True)
     # Compute entropy for each sample
@@ -163,7 +186,10 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         num_labeled_samples = int(total_samples * initial_labeled_ratio)
         num_per_class = num_labeled_samples // num_classes
         
-        labels = np.array(train_dataset.targets)
+        try:
+            labels = extract_labels(train_dataset)
+        except AttributeError as e:
+            raise AttributeError(f"Failed to extract labels for dataset '{dataset_name}': {str(e)}")
         indices_per_class = {i: np.where(labels == i)[0] for i in range(num_classes)}
         labeled_indices = []
         for idx in range(num_classes):
@@ -193,7 +219,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             unlabeled_embeddings, unlabled_ground_truth = get_embeddings(
                 unlabeled_subset, model, device, batch_size, save_path=unlabeled_embeddings_path
             )
-            
+
         # Apply FAISS-KNN to embedings for data labeling
         labeled_embeddings = labeled_embeddings.numpy().astype('float32')
         unlabeled_embeddings = unlabeled_embeddings.numpy().astype('float32')
