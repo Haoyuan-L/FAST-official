@@ -72,7 +72,7 @@ def compute_largest_margin(logits):
     uncertainty = 1.0 - margin
     return uncertainty
 
-def get_embeddings(dataset, model, device, batch_size=64):
+def get_embeddings(dataset, model, device, batch_size=64, save_path=None):
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     embeddings = []
     labels = []
@@ -85,6 +85,13 @@ def get_embeddings(dataset, model, device, batch_size=64):
             labels.extend(targets.numpy())
     embeddings = torch.cat(embeddings)
     labels = np.array(labels)
+
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        torch.save(embeddings, f"{save_path}_embeddings.pt")
+        np.save(f"{save_path}_labels.npy", labels)
+        print(f"Saved embeddings and labels to {save_path}_embeddings.pt and {save_path}_labels.npy")
+
     return embeddings, labels
 
 # Calculate logit (probability distribution over classes)
@@ -171,9 +178,22 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         unlabeled_subset = torch.utils.data.Subset(train_dataset_for_embeddings, unlabeled_indices)
 
         # Utilize SIGLIP encoder to encode all the training data
-        labeled_embeddings, labeled_labels = get_embeddings(labeled_subset, model, device, batch_size)
-        unlabeled_embeddings, unlabled_ground_truth = get_embeddings(unlabeled_subset, model, device, batch_size)
-
+        # Load the embeddings if they exist
+        labeled_embeddings_path = f"{dataset_name}_embeddings_labeled.pt"
+        unlabeled_embeddings_path = f"{dataset_name}_embeddings_unlabeled.pt"
+        if os.path.exists(labeled_embeddings_path):
+            labeled_embeddings = torch.load(labeled_embeddings_path)
+        else:
+            labeled_embeddings, labeled_labels = get_embeddings(
+                labeled_subset, model, device, batch_size, save_path=labeled_embeddings_path
+            )
+        if os.path.exists(unlabeled_embeddings_path):
+            unlabeled_embeddings = torch.load(unlabeled_embeddings_path)
+        else:
+            unlabeled_embeddings, unlabled_ground_truth = get_embeddings(
+                unlabeled_subset, model, device, batch_size, save_path=unlabeled_embeddings_path
+            )
+            
         # Apply FAISS-KNN to embedings for data labeling
         labeled_embeddings = labeled_embeddings.numpy().astype('float32')
         unlabeled_embeddings = unlabeled_embeddings.numpy().astype('float32')
