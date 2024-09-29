@@ -95,7 +95,7 @@ def compute_largest_margin(logits):
     uncertainty = 1.0 - margin
     return uncertainty
 
-def get_embeddings(dataset, model, device, batch_size=64, save_path=None):
+def get_embeddings(dataset, model, device, fname, batch_size=64, save_path=None):
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     embeddings = []
     labels = []
@@ -111,10 +111,7 @@ def get_embeddings(dataset, model, device, batch_size=64, save_path=None):
 
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        torch.save(embeddings, f"{save_path}_embeddings.pt")
-        np.save(f"{save_path}_labels.npy", labels)
-        print(f"Saved embeddings and labels to {save_path}_embeddings.pt and {save_path}_labels.npy")
-
+        torch.save(embeddings, save_path+fname)
     return embeddings, labels
 
 # Calculate logit (probability distribution over classes)
@@ -205,19 +202,20 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
 
         # Utilize SIGLIP encoder to encode all the training data
         # Load the embeddings if they exist
-        labeled_embeddings_path = f"{dataset_name}_embeddings_labeled.pt"
-        unlabeled_embeddings_path = f"{dataset_name}_embeddings_unlabeled.pt"
-        if os.path.exists(labeled_embeddings_path):
-            labeled_embeddings = torch.load(labeled_embeddings_path)
+        save_path = "./embeddings/"
+        labeled_embeddings_fname = f"{dataset_name}_embeddings_labeled.pt"
+        unlabeled_embeddings_fname = f"{dataset_name}_embeddings_unlabeled.pt"
+        if os.path.exists(save_path + labeled_embeddings_fname):
+            labeled_embeddings = torch.load(save_path + labeled_embeddings_fname)
         else:
             labeled_embeddings, labeled_labels = get_embeddings(
-                labeled_subset, model, device, batch_size, save_path=labeled_embeddings_path
+                labeled_subset, model, device, fname=labeled_embeddings_fname, batch_size=batch_size, save_path=save_path
             )
-        if os.path.exists(unlabeled_embeddings_path):
-            unlabeled_embeddings = torch.load(unlabeled_embeddings_path)
+        if os.path.exists(save_path + unlabeled_embeddings_fname):
+            unlabeled_embeddings = torch.load(save_path + save_path + unlabeled_embeddings_fname)
         else:
             unlabeled_embeddings, unlabled_ground_truth = get_embeddings(
-                unlabeled_subset, model, device, batch_size, save_path=unlabeled_embeddings_path
+                unlabeled_subset, model, device, fname=unlabeled_embeddings_fname, batch_size=batch_size, save_path=save_path
             )
 
         # Apply FAISS-KNN to embedings for data labeling
