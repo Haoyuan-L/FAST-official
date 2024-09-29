@@ -212,7 +212,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
                 labeled_subset, model, device, fname=labeled_embeddings_fname, batch_size=batch_size, save_path=save_path
             )
         if os.path.exists(save_path + unlabeled_embeddings_fname):
-            unlabeled_embeddings = torch.load(save_path + save_path + unlabeled_embeddings_fname)
+            unlabeled_embeddings = torch.load(save_path + unlabeled_embeddings_fname)
         else:
             unlabeled_embeddings, unlabled_ground_truth = get_embeddings(
                 unlabeled_subset, model, device, fname=unlabeled_embeddings_fname, batch_size=batch_size, save_path=save_path
