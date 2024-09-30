@@ -39,7 +39,7 @@ class CNN4Conv(nn.Module):
         features = features.view((features.size(0), -1))
         logits = self.linear(features)
         
-        return logits, features
+        return logits
     
     def get_embedding_dim(self):
         return self.emb_dim
