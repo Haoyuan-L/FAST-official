@@ -17,6 +17,7 @@ class Server(fl.server.Server):
 		self.data, self.num_classes, self.num_samples = data_loader()
 		self.input_shape = self.get_dataset_config(dataset)
 		self.model_loader = model_loader
+		self.model = self.model_loader(input_shape=self.input_shape, num_classes=self.num_classes).to(self.device)
 		self.init_model = init_model
 		self.initial_lr = initial_lr
 		self.decay_factor = decay_factor
@@ -56,8 +57,6 @@ class Server(fl.server.Server):
 		return input_shape
 
 	def set_parameters(self, parameters, config):
-		if not hasattr(self, 'model'):
-			self.model = self.model_loader(input_shape=self.input_shape, num_classes=self.num_classes).to(self.device)
 		params_dict = zip(self.model.state_dict().keys(), parameters)
 		state_dict = collections.OrderedDict({k: torch.tensor(v) for k, v in params_dict})
 		self.model.load_state_dict(state_dict, strict=True)
