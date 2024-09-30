@@ -158,18 +158,18 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
 
     elif dataset_name.lower() == "pathmnist":
         with contextlib.redirect_stdout(None):
-            train_dataset = PathMNIST(root=data_dir, train=True, download=True, transform=get_transforms(dataset_name, augmentation=True))
-            train_dataset_for_embeddings = PathMNIST(root=data_dir, train=True, download=True, transform=preprocess)
+            train_dataset = PathMNIST(root=data_dir, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
+            train_dataset_for_embeddings = PathMNIST(root=data_dir, split="train", download=True, transform=preprocess)
         with contextlib.redirect_stdout(None):
-            test_dataset = PathMNIST(root=data_dir, train=False, download=True, transform=get_transforms(dataset_name, augmentation=False))
+            test_dataset = PathMNIST(root=data_dir, split="test", download=True, transform=get_transforms(dataset_name, augmentation=False))
         num_classes = 9
 
     elif dataset_name.lower() == "dermamnist":
         with contextlib.redirect_stdout(None):
-            train_dataset = DermaMNIST(root=data_dir, train=True, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
-            train_dataset_for_embeddings = DermaMNIST(root=data_dir, train=True, split="train", download=True, transform=preprocess)
+            train_dataset = DermaMNIST(root=data_dir, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
+            train_dataset_for_embeddings = DermaMNIST(root=data_dir, split="train", download=True, transform=preprocess)
         with contextlib.redirect_stdout(None):
-            test_dataset = DermaMNIST(root=data_dir, train=False, split="test", download=True, transform=get_transforms(dataset_name, augmentation=False))
+            test_dataset = DermaMNIST(root=data_dir, split="test", download=True, transform=get_transforms(dataset_name, augmentation=False))
         num_classes = 7
     else:
         raise ValueError(f"Dataset {dataset_name} is not supported.")
