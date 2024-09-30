@@ -40,7 +40,7 @@ class Client(fl.client.NumPyClient):
 		if dataset.lower() == "cifar10" or "svhn":
 			input_shape=(3, 32, 32)
 		elif dataset.lower() == "pathmnist" or "dermamnist":
-			input_shape=(1, 28, 28)
+			input_shape=(3, 28, 28)
 		else:
 			raise NotImplementedError(f"Dataset '{dataset}' is not supported.")
 		return input_shape

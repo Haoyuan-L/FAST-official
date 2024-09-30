@@ -161,7 +161,7 @@ def get_resnet18_network(num_classes=10, weights_fp=None):
         model.load_state_dict(torch.load(weights_fp))
     return model
 
-def get_cnn4_network(input_shape=(3, 32, 32), num_classes=10, weights_fp=None):
+def get_cnn4_network(input_shape, num_classes, weights_fp=None):
     in_channels = input_shape[0]
     img_size = input_shape[1]
     model = CNN4Conv(in_channels, num_classes, img_size)
