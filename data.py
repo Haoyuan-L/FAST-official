@@ -119,10 +119,7 @@ def get_logits_from_knn(k, indices, labeled_labels, num_classes):
     logits = []
     for neighbor_indices in indices:
         neighbor_labels = labeled_labels[neighbor_indices]
-        # Debugging statements
-        print(f"Neighbor Labels Shape: {neighbor_labels.shape}")
-        print(f"Neighbor Labels Sample: {neighbor_labels[:5]}")
-        
+
         if neighbor_labels.ndim > 1:
             neighbor_labels = np.argmax(neighbor_labels, axis=1)
         else:
@@ -248,7 +245,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         print(f"Labeling Accuracy: {labeling_acc * 100:.2f}%")
 
         all_labels = np.zeros(len(train_dataset), dtype=int)
-        all_labels[labeled_indices] = labeled_labels
+        all_labels[labeled_indices] = labeled_labels.flatten()
         all_labels[unlabeled_indices] = predicted_labels
 
         # load uncertainty method
