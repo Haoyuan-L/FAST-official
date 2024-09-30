@@ -138,7 +138,9 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16-SigLIP-512', 'webli')
     model.to(device)
     model.eval()
-
+    if not os.path.exists(data_dir):
+        os.mkdir(data_dir)
+    
     # Choose dataset based on the provided name
     if dataset_name.lower() == "cifar10":
         with contextlib.redirect_stdout(None):
