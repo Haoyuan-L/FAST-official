@@ -6,7 +6,7 @@ import torch.optim as optim
 
 class Client(fl.client.NumPyClient):
 
-	def __init__(self, dataset, cid, model_loader, data_loader, device='cuda'):
+	def __init__(self, cid, dataset, model_loader, data_loader, device='cuda'):
 		self.cid = cid
 		self.data, self.num_classes, self.num_samples = data_loader()
 		self.input_shape = self.get_dataset_config(dataset)
