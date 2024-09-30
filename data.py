@@ -300,7 +300,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             # Map back to dataset indices
             uncertain_sample_dataset_indices = np.array(unlabeled_indices)[uncertain_sample_indices]
             oracle_annotation_labels = unlabeled_ground_truth[uncertain_sample_indices]
-            all_labels[uncertain_sample_dataset_indices] = oracle_annotation_labels
+            all_labels[uncertain_sample_dataset_indices] = oracle_annotation_labels.flatten()
         else:
             uncertainty_order = np.argsort(-uncertainty_score)
             uncertain_indices = uncertainty_order[:num_query_samples]
