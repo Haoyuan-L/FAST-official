@@ -13,22 +13,20 @@ def conv3x3(in_channels, out_channels, **kwargs):
 class CNN4Conv(nn.Module):
     def __init__(self, in_channels, num_classes, img_size):
         super(CNN4Conv, self).__init__()
-        in_channels = in_channels
-        num_classes = num_classes
-        hidden_size = 64
-        
+        self.hidden_size = 64
+
         if img_size == 32:
-            self.emb_dim = hidden_size * 2 * 2
+            self.emb_dim = self.hidden_size * 2 * 2  # 64 * 2 * 2 = 256
         elif img_size == 28:
-            self.emb_dim = hidden_size
+            self.emb_dim = self.hidden_size  # 64
         else:
-            raise NotImplemented
-            
+            raise NotImplementedError(f"Unsupported img_size: {img_size}")
+
         self.features = nn.Sequential(
-            conv3x3(in_channels, hidden_size),
-            conv3x3(hidden_size, hidden_size),
-            conv3x3(hidden_size, hidden_size),
-            conv3x3(hidden_size, hidden_size)
+            conv3x3(in_channels, self.hidden_size),
+            conv3x3(self.hidden_size, self.hidden_size),
+            conv3x3(self.hidden_size, self.hidden_size),
+            conv3x3(self.hidden_size, self.hidden_size)
         )
 
         self.linear = nn.Linear(self.emb_dim, num_classes)
@@ -38,9 +36,8 @@ class CNN4Conv(nn.Module):
         features = self.features(x)
         features = features.view((features.size(0), -1))
         logits = self.linear(features)
-        
         return logits
-    
+
     def get_embedding_dim(self):
         return self.emb_dim
 

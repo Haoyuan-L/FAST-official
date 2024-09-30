@@ -240,6 +240,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         logits = get_logits_from_knn(k, indices, labeled_labels, num_classes)
         predicted_labels = np.array(np.argmax(logits, axis=1))
         unlabeled_ground_truth = np.array(unlabled_ground_truth)
+
         corrects = np.sum(predicted_labels == unlabeled_ground_truth)
         labeling_acc = corrects / len(unlabeled_ground_truth)
         print(f"Labeling Accuracy: {labeling_acc * 100:.2f}%")

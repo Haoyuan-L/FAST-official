@@ -9,12 +9,13 @@ class Client(fl.client.NumPyClient):
 	def __init__(self, cid, model_loader, data_loader, device='cuda'):
 		self.cid = cid
 		self.data, self.num_classes, self.num_samples = data_loader()
+        self.input_shape = self.get_dataset_config(dataset)
 		self.model_loader = model_loader
 		self.device = device
 
 	def set_parameters(self, parameters, config):
 		if not hasattr(self, 'model'):
-			self.model = self.model_loader(num_classes=self.num_classes).to(self.device)
+			self.model = self.model_loader(input_shape=self.input_shape, num_classes=self.num_classes).to(self.device)
 		params_dict = zip(self.model.state_dict().keys(), parameters)
 		state_dict = collections.OrderedDict({k: torch.tensor(v) for k, v in params_dict})
 		self.model.load_state_dict(state_dict, strict=True)
@@ -34,6 +35,15 @@ class Client(fl.client.NumPyClient):
 
 	def evaluate(self, parameters, config):
 		raise NotImplementedError('Client-side evaluation is not implemented!')
+
+    def get_dataset_config(self, dataset):
+        if dataset.lower() == "cifar10" or "svhn":
+            input_shape=(3, 32, 32)
+        elif dataset.lower() == "pathmnist" or "dermamnist":
+            input_shape=(3, 28, 28)
+        else:
+            raise NotImplementedError(f"Dataset '{dataset}' is not supported.")
+        return input_shape
 
 	@staticmethod
 	def train(ds, model, epochs, optimizer, num_classes, metrics=None, loss=torch.nn.CrossEntropyLoss(), verbose=False):
