@@ -8,13 +8,14 @@ from utils import get_learning_rate
 
 class Server(fl.server.Server):
 
-	def __init__(self, model_loader, data_loader, num_rounds, num_clients=10,
+	def __init__(self, dataset, model_loader, data_loader, num_rounds, num_clients=10,
 		participation=1.0, init_model=None, log_level=logging.INFO,
 		initial_lr=1e-3, decay_factor=0.1, num_decays=3):
 
 		self.num_rounds = num_rounds
 		self.data_loader = data_loader
 		self.data, self.num_classes, self.num_samples = data_loader()
+		self.input_shape = self.get_dataset_config(dataset)
 		self.model_loader = model_loader
 		self.init_model = init_model
 		self.initial_lr = initial_lr
@@ -44,10 +45,19 @@ class Server(fl.server.Server):
 
 	def get_parameters(self, config={}):
 		return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
+	
+	def get_dataset_config(self, dataset):
+		if dataset.lower() == "cifar10" or "svhn":
+			input_shape=(3, 32, 32)
+		elif dataset.lower() == "pathmnist" or "dermamnist":
+			input_shape=(3, 28, 28)
+		else:
+			raise NotImplementedError(f"Dataset '{dataset}' is not supported.")
+		return input_shape
 
 	def set_parameters(self, parameters, config):
 		if not hasattr(self, 'model'):
-			self.model = self.model_loader(num_classes=self.num_classes).to(self.device)
+			self.model = self.model_loader(input_shape=self.input_shape, num_classes=self.num_classes).to(self.device)
 		params_dict = zip(self.model.state_dict().keys(), parameters)
 		state_dict = collections.OrderedDict({k: torch.tensor(v) for k, v in params_dict})
 		self.model.load_state_dict(state_dict, strict=True)
@@ -57,7 +67,7 @@ class Server(fl.server.Server):
 		if self.init_model is not None:
 			self.init_weights = torch.load(self.init_model, map_location=self.device).state_dict()
 		else:
-			self.init_weights = [val.cpu().numpy() for _, val in self.model_loader(num_classes=self.num_classes).state_dict().items()]
+			self.init_weights = [val.cpu().numpy() for _, val in self.model_loader(input_shape=self.input_shape, num_classes=self.num_classes).state_dict().items()]
 		return fl.common.ndarrays_to_parameters(self.init_weights)
 
 	def get_evaluation_fn(self):
