@@ -55,7 +55,7 @@ class Client(fl.client.NumPyClient):
 		for epoch in range(epochs):
 			train_loss = 0.0
 			for _, (x, y) in enumerate(ds):
-				x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True).long()
+				x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True).long().squeeze()
 				optimizer.zero_grad()
 				preds = model(x)
 				_loss = loss(preds, y)
