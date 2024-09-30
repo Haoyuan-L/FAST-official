@@ -11,15 +11,15 @@ def conv3x3(in_channels, out_channels, **kwargs):
     )
 
 class CNN4Conv(nn.Module):
-    def __init__(self, in_channels, num_classes, args):
+    def __init__(self, in_channels, num_classes, img_size):
         super(CNN4Conv, self).__init__()
         in_channels = in_channels
         num_classes = num_classes
         hidden_size = 64
         
-        if args.img_size == 32:
+        if img_size == 32:
             self.emb_dim = hidden_size * 2 * 2
-        elif args.img_size == 28:
+        elif img_size == 28:
             self.emb_dim = hidden_size
         else:
             raise NotImplemented
