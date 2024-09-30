@@ -27,13 +27,13 @@ def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split
 
     def create_client(cid):
         time.sleep(int(cid) * 0.75)
-        return Client(int(cid), model_loader=network.get_cnn4_network,
+        return Client(int(cid), dataset=dataset, model_loader=network.get_cnn4_network,
                       data_loader=lambda: get_data(dataset_name=dataset, id=cid, num_clients=num_clients, 
                                                    split=data_split, alpha=skewness_alpha, class_aware=class_aware, uncertainty=uncertainty))
 
     def create_server(init_model=None):
         return Server(num_rounds=num_rounds, num_clients=num_clients, participation=participation,
-                      model_loader=network.get_cnn4_network, 
+                      model_loader=network.get_cnn4_network, dataset=dataset, 
                       data_loader=lambda: get_data(dataset_name=dataset, split=data_split, alpha=skewness_alpha, return_eval_ds=True), 
                       init_model=init_model)
     ray.shutdown()
