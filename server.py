@@ -114,7 +114,7 @@ class Server(fl.server.Server):
 		_loss = 0.0
 		with torch.no_grad():
 			for _, (x, y) in enumerate(ds):
-				x, y = x.to(device), y.to(device).long()
+				x, y = x.to(device), y.to(device).long().squeeze()
 				preds = model(x)
 				_loss += loss(preds, y).item()
 				metrics(preds.max(1)[-1], y)
