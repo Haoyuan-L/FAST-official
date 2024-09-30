@@ -115,18 +115,24 @@ def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_pat
         np.save(save_path+lname, labels)
     return embeddings, labels
 
-# Calculate logit (probability distribution over classes)
 def get_logits_from_knn(k, indices, labeled_labels, num_classes):
     logits = []
     for neighbor_indices in indices:
-        # Get the labels of the k-nearest neighbors
         neighbor_labels = labeled_labels[neighbor_indices]
-        # Count occurrences of each label
+        # Debugging statements
+        print(f"Neighbor Labels Shape: {neighbor_labels.shape}")
+        print(f"Neighbor Labels Sample: {neighbor_labels[:5]}")
+        
+        if neighbor_labels.ndim > 1:
+            neighbor_labels = np.argmax(neighbor_labels, axis=1)
+        else:
+            neighbor_labels = neighbor_labels.flatten()
+        neighbor_labels = neighbor_labels.astype(int)
         label_count = Counter(neighbor_labels)
         # Create a probability distribution (logit format) over all classes
         logit = np.zeros(num_classes)
         for label, count in label_count.items():
-            logit[label] = count / k  # Fraction of neighbors that belong to the class
+            logit[label] = count / k # Fraction of neighbors that belong to the class
         logits.append(logit)
     return np.array(logits)
 
