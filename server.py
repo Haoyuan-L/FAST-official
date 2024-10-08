@@ -47,10 +47,12 @@ class Server(fl.server.Server):
 		return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
 	
 	def get_dataset_config(self, dataset):
-		if dataset.lower() in ["cifar10", "svhn"]:
+		if dataset.lower() in ["cifar10", "svhn", "cifar100"]:
 			input_shape=(3, 32, 32)
 		elif dataset.lower() in ["pathmnist", "dermamnist"]:
 			input_shape=(3, 28, 28)
+		elif dataset.lower() == "tiny-imagenet":
+			input_shape = (3, 64, 64)
 		else:
 			raise NotImplementedError(f"Dataset '{dataset}' is not supported.")
 		return input_shape

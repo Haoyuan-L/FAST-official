@@ -23,9 +23,14 @@ def get_transforms(dataset_name, augmentation=True):
            'octmnist': (0.5,), 'organamnist': (0.5,), 'dermamnist': (0.5,), 'bloodmnist': (0.5,), 'tiny-imagenet': [0.277, 0.269, 0.282]}
 
     if augmentation:
-        data_transform = [transforms.RandomHorizontalFlip(), 
-			              transforms.ToTensor(), 
-			              transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
+        if dataset_name.lower() == "tiny-imagenet":
+            data_transform = [transforms.RandomHorizontalFlip(64, padding=4), 
+                            transforms.ToTensor(), 
+                            transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
+        else:
+            data_transform = [transforms.RandomHorizontalFlip(32, padding=4), 
+                            transforms.ToTensor(), 
+                            transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
     else:
         data_transform = [transforms.ToTensor(), 
 						  transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
