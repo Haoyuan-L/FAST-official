@@ -17,12 +17,14 @@ class CNN4Conv(nn.Module):
         num_classes = num_classes
         hidden_size = 64
         
-        if img_size == 32:
+        if img_size == 64:
+            self.emb_dim = hidden_size * 4 * 4
+        elif img_size == 32:
             self.emb_dim = hidden_size * 2 * 2
         elif img_size == 28:
-            self.emb_dim = hidden_size
+            self.emb_dim = hidden_size * 1 * 1
         else:
-            raise NotImplemented
+            raise NotImplementedError(f"Unsupported image size: {img_size}")
             
         self.features = nn.Sequential(
             conv3x3(in_channels, hidden_size),
