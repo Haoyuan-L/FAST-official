@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import contextlib
 from torch.utils.data import DataLoader
 from medmnist.dataset import PathMNIST, DermaMNIST
-from torchvision.datasets import CIFAR10, SVHN
+from torchvision.datasets import CIFAR10, SVHN, CIFAR100
 import torchvision.transforms as transforms
 import numpy as np
 from utils import *
@@ -17,10 +17,10 @@ def get_transforms(dataset_name, augmentation=True):
     
     MEAN = {'mnist': (0.1307,), 'fmnist': (0.5,), 'emnist': (0.5,), 'svhn': [0.4376821, 0.4437697, 0.47280442], 
             'cifar10': [0.485, 0.456, 0.406], 'cifar100': [0.507, 0.487, 0.441], 'pathmnist': (0.5,), 
-            'octmnist': (0.5,), 'organamnist': (0.5,), 'dermamnist': (0.5,), 'bloodmnist': (0.5,)}
+            'octmnist': (0.5,), 'organamnist': (0.5,), 'dermamnist': (0.5,), 'bloodmnist': (0.5,), 'tiny-imagenet': [0.480, 0.448, 0.398]}
     STD = {'mnist': (0.3081,), 'fmnist': (0.5,), 'emnist': (0.5,), 'svhn': [0.19803012, 0.20101562, 0.19703614], 
            'cifar10': [0.229, 0.224, 0.225], 'cifar100': [0.267, 0.256, 0.276], 'pathmnist': (0.5,),
-           'octmnist': (0.5,), 'organamnist': (0.5,), 'dermamnist': (0.5,), 'bloodmnist': (0.5,)}
+           'octmnist': (0.5,), 'organamnist': (0.5,), 'dermamnist': (0.5,), 'bloodmnist': (0.5,), 'tiny-imagenet': [0.277, 0.269, 0.282]}
 
     if augmentation:
         data_transform = [transforms.RandomHorizontalFlip(), 
@@ -38,10 +38,6 @@ def extract_labels(dataset):
         labels = dataset.targets
     elif hasattr(dataset, 'labels'):
         labels = dataset.labels
-    elif hasattr(dataset, 'target'):
-        labels = dataset.target
-    elif hasattr(dataset, 'label'):
-        labels = dataset.label
     else:
         raise AttributeError("Dataset does not have a known attribute for labels")
 
@@ -149,7 +145,6 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         with contextlib.redirect_stdout(None):
             train_dataset = CIFAR10(root=data_dir, train=True, download=True, transform=get_transforms(dataset_name, augmentation=True))
             train_dataset_for_embeddings = CIFAR10(root=data_dir, train=True, download=True, transform=preprocess)
-        with contextlib.redirect_stdout(None):
             test_dataset = CIFAR10(root=data_dir, train=False, download=True, transform=get_transforms(dataset_name, augmentation=False))
         num_classes = 10
 
@@ -157,7 +152,6 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         with contextlib.redirect_stdout(None):
             train_dataset = SVHN(root=data_dir, split='train', download=True, transform=get_transforms(dataset_name, augmentation=True))
             train_dataset_for_embeddings = SVHN(root=data_dir, split='train', download=True, transform=preprocess)
-        with contextlib.redirect_stdout(None):
             test_dataset = SVHN(root=data_dir, split='test', download=True, transform=get_transforms(dataset_name, augmentation=False))
         num_classes = 10
 
@@ -165,7 +159,6 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         with contextlib.redirect_stdout(None):
             train_dataset = PathMNIST(root=data_dir, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
             train_dataset_for_embeddings = PathMNIST(root=data_dir, split="train", download=True, transform=preprocess)
-        with contextlib.redirect_stdout(None):
             test_dataset = PathMNIST(root=data_dir, split="test", download=True, transform=get_transforms(dataset_name, augmentation=False))
         num_classes = 9
 
@@ -173,9 +166,22 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         with contextlib.redirect_stdout(None):
             train_dataset = DermaMNIST(root=data_dir, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
             train_dataset_for_embeddings = DermaMNIST(root=data_dir, split="train", download=True, transform=preprocess)
-        with contextlib.redirect_stdout(None):
             test_dataset = DermaMNIST(root=data_dir, split="test", download=True, transform=get_transforms(dataset_name, augmentation=False))
         num_classes = 7
+
+    elif dataset_name.lower() == "cifar100":
+        with contextlib.redirect_stdout(None):
+            train_dataset = CIFAR100(root=data_dir, train=True, download=True, transform=get_transforms(dataset_name, augmentation=True))
+            train_dataset_for_embeddings = CIFAR100(root=data_dir, train=True, download=True, transform=preprocess)
+            test_dataset = CIFAR100(root=data_dir, train=False, download=True, transform=get_transforms(dataset_name, augmentation=False))
+        num_classes = 100
+    
+    elif dataset_name.lower() == "tiny-imagenet":
+        with contextlib.redirect_stdout(None):
+            train_dataset = TinyImageNet(root=data_dir, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
+            train_dataset_for_embeddings = TinyImageNet(root=data_dir, split="train", download=True, transform=preprocess)
+            test_dataset = TinyImageNet(root=data_dir, split="val", download=True, transform=get_transforms(dataset_name, augmentation=False))
+        num_classes = 200
     else:
         raise ValueError(f"Dataset {dataset_name} is not supported.")
  

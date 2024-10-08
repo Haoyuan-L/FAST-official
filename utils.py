@@ -6,6 +6,14 @@ import os
 import random
 import math
 import pickle
+from torchvision.datasets.vision import VisionDataset
+from torchvision.datasets.folder import default_loader
+from torchvision.datasets.utils import (
+    check_integrity,
+    download_url,
+    extract_archive,
+    verify_str_arg,
+)
 
 def none_or_str(value):
     if value == 'None':
@@ -197,3 +205,100 @@ def get_learning_rate(initial_lr, current_round, total_rounds, decay_factor=0.5,
     new_lr = initial_lr * (decay_factor ** num_applied_decays)
     
     return new_lr
+
+class TinyImageNet(VisionDataset):
+    base_folder = 'tiny-imagenet-200'
+    url = 'http://cs231n.stanford.edu/tiny-imagenet-200.zip'
+    filename = 'tiny-imagenet-200.zip'
+    md5 = '90528d7ca1a48142e341f4ef8d21d0de'
+
+    def __init__(self, root, split='train', transform=None, target_transform=None, download=False):
+        super(TinyImageNet, self).__init__(root, transform=transform, target_transform=target_transform)
+        self.split = verify_str_arg(split, "split", ("train", "val"))
+        self.root = os.path.expanduser(root)
+        self.dataset_folder = os.path.join(self.root, self.base_folder)
+        self.loader = default_loader
+
+        if not self._check_integrity():
+            if download:
+                self._download()
+            else:
+                raise RuntimeError('Dataset not found. You can use download=True to download it.')
+        else:
+            print('Files already downloaded and verified.')
+
+        # Extract if necessary
+        if not os.path.isdir(self.dataset_folder):
+            print('Extracting...')
+            extract_archive(os.path.join(self.root, self.filename), self.root)
+
+        # Prepare data
+        classes, class_to_idx = find_classes(os.path.join(self.dataset_folder, 'wnids.txt'))
+        self.classes = classes
+        self.class_to_idx = class_to_idx
+        self.data = make_dataset(self.dataset_folder, self.split, class_to_idx)
+        self.targets = [target for _, target in self.data]  # Add targets attribute
+
+    def _download(self):
+        print('Downloading...')
+        download_url(self.url, root=self.root, filename=self.filename, md5=self.md5)
+        print('Extracting...')
+        extract_archive(os.path.join(self.root, self.filename), self.root)
+
+    def _check_integrity(self):
+        return check_integrity(os.path.join(self.root, self.filename), self.md5)
+
+    def __getitem__(self, index):
+        img_path, target = self.data[index]
+        image = self.loader(img_path)
+
+        if self.transform is not None:
+            image = self.transform(image)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return image, target
+
+    def __len__(self):
+        return len(self.data)
+
+def find_classes(class_file):
+    with open(class_file, 'r') as f:
+        classes = [line.strip() for line in f.readlines()]
+    classes.sort()
+    class_to_idx = {cls_name: idx for idx, cls_name in enumerate(classes)}
+    return classes, class_to_idx
+
+def make_dataset(root, split, class_to_idx):
+    images = []
+    if split == 'train':
+        train_dir = os.path.join(root, 'train')
+        for cls_name in os.listdir(train_dir):
+            cls_dir = os.path.join(train_dir, cls_name, 'images')
+            if os.path.isdir(cls_dir):
+                for img_name in os.listdir(cls_dir):
+                    img_path = os.path.join(cls_dir, img_name)
+                    item = (img_path, class_to_idx[cls_name])
+                    images.append(item)
+    elif split == 'val':
+        val_dir = os.path.join(root, 'val')
+        img_dir = os.path.join(val_dir, 'images')
+        val_annotations = os.path.join(val_dir, 'val_annotations.txt')
+
+        # Map image filenames to class names
+        cls_map = {}
+        with open(val_annotations, 'r') as f:
+            for line in f:
+                tokens = line.strip().split('\t')
+                img_name, cls_name = tokens[0], tokens[1]
+                cls_map[img_name] = cls_name
+
+        for img_name in os.listdir(img_dir):
+            img_path = os.path.join(img_dir, img_name)
+            cls_name = cls_map[img_name]
+            item = (img_path, class_to_idx[cls_name])
+            images.append(item)
+    else:
+        raise ValueError(f"Invalid split: {split}. Expected 'train' or 'val'.")
+
+    return images
