@@ -159,16 +159,19 @@ def ResNet101(num_classes=10):
 
 def ResNet152(num_classes=10):
     return ResNet(Bottleneck, [3, 8, 36, 3], num_classes=num_classes)
-
-class LinearClassifier(nn.Module):
-    def __init__(self, emb_dim, num_classes):
-        super(LinearClassifier, self).__init__()
-        self.linear = nn.Linear(emb_dim, num_classes)
-        self.linear.bias.data.fill_(0)  # Initialize biases to zero
+    
+class LinearModel(nn.Module):
+    def __init__(self, hidden_size, num_classes=1, dropout_rate=0.3):
+        super().__init__()
+        self.batchnorm = nn.BatchNorm1d(hidden_size, affine=False, eps=1e-6)
+        self.dropout = nn.Dropout(p=dropout_rate)
+        self.linear = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x):
-        logits = self.linear(x)
-        return logits
+        x = self.batchnorm(x)
+        x = self.dropout(x)
+        x = self.linear(x)
+        return x
     
 """ Helper function to get the network model """
 
@@ -191,7 +194,7 @@ def get_linear_network(input_shape, num_classes, weights_fp=None):
     Initializes the LinearClassifier model.
     """
     emb_dim = input_shape[0]
-    model = LinearClassifier(emb_dim, num_classes)
+    model = LinearModel(hidden_size=emb_dim, num_classes=num_classes)
     if weights_fp is not None:
         model.load_state_dict(torch.load(weights_fp))
     return model

@@ -22,7 +22,7 @@ from data import get_data
 from client import Client
 from server import Server
 
-def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split='iid', max_parallel_executions=5,
+def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split='iid', max_parallel_executions=5, active_oracle=True,
                    timeout=1500, init_model=None, dataset="cifar10", skewness_alpha=None, class_aware=False, uncertainty="norm", model="resnet18"):
     
     embed_input = False
@@ -106,10 +106,11 @@ def run_with_different_configs(yaml_config_file):
         history = run_experiment(num_rounds=config["num_rounds"], num_clients=config["num_clients"], model=config["model"],
                                  data_split=config["data_split"], participation=config["participation"],
                                  max_parallel_executions=config["max_parallel_executions"], dataset=config["dataset"],
-                                 skewness_alpha=config["skewness_alpha"], class_aware=config["class_aware"], uncertainty=config["uncertainty"])
+                                 skewness_alpha=config["skewness_alpha"], class_aware=config["class_aware"], uncertainty=config["uncertainty"],
+                                 active_oracle=config["active_oracle"])
 
         # Log the results of the experiment
-        fname = config["dataset"]+ "_" + config["data_split"] + "_" + config["uncertainty"] + "_" + "class_aware-" + str(config["class_aware"]) + ".log"
+        fname = config["model"] + "_" + config["dataset"]+ "_" + config["data_split"] + "_" + config["uncertainty"] + "_" + "class_aware-" + str(config["class_aware"]) + ".log"
         log_results(history, config, fname)
 
 

@@ -137,7 +137,7 @@ def get_logits_from_knn(k, indices, labeled_labels, num_classes):
     return np.array(logits)
 
 def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, embed_input=False,
-             split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm"):
+             split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm", active_oracle=True):
 
     # load the OpenCLIP model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -268,74 +268,77 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         all_labels = np.zeros(len(train_dataset), dtype=int)
         all_labels[labeled_indices] = labeled_labels.flatten()
         all_labels[unlabeled_indices] = predicted_labels
+        # save the pseudo labels
+        np.save(f"{dataset_name}_None_labels.npy", all_labels)
 
-        # load uncertainty method
-        if uncertainty == "norm":
-            uncertainty_func = compute_norm
-        elif uncertainty == "entropy":
-            uncertainty_func = compute_entropy
-        elif uncertainty == "least_confidence":
-            uncertainty_func = compute_least_confidence
-        elif uncertainty == "smallest_margin":
-            uncertainty_func = compute_smallest_margin
-        elif uncertainty == "largest_margin":
-            uncertainty_func = compute_largest_margin
-        else:
-            raise ValueError(f"Unknown uncertainty method: {uncertainty}")
+        if active_oracle:
+            # load uncertainty method
+            if uncertainty == "norm":
+                uncertainty_func = compute_norm
+            elif uncertainty == "entropy":
+                uncertainty_func = compute_entropy
+            elif uncertainty == "least_confidence":
+                uncertainty_func = compute_least_confidence
+            elif uncertainty == "smallest_margin":
+                uncertainty_func = compute_smallest_margin
+            elif uncertainty == "largest_margin":
+                uncertainty_func = compute_largest_margin
+            else:
+                raise ValueError(f"Unknown uncertainty method: {uncertainty}")
 
-        # select the most uncertain samples for manual labeling (Oracle)
-        query_ratio = 0.05
-        uncertainty_score = uncertainty_func(logits)
-        num_query_samples = int(query_ratio * len(unlabeled_indices))
-        class_aware = True  # Set this to False for class-agnostic sampling
+            # select the most uncertain samples for manual labeling (Oracle)
+            query_ratio = 0.05
+            uncertainty_score = uncertainty_func(logits)
+            num_query_samples = int(query_ratio * len(unlabeled_indices))
+            class_aware = True  # Set this to False for class-agnostic sampling
 
-        if class_aware:
-            predicted_labels = np.argmax(logits, axis=1)
-            num_classes = logits.shape[1]
-            num_query_samples_per_class = num_query_samples // num_classes
-            uncertain_sample_indices = []
+            if class_aware:
+                predicted_labels = np.argmax(logits, axis=1)
+                num_classes = logits.shape[1]
+                num_query_samples_per_class = num_query_samples // num_classes
+                uncertain_sample_indices = []
 
-            for c in range(num_classes):
-                # Get indices of samples predicted to belong to class c
-                class_member_mask = predicted_labels == c
-                cls_indices = np.where(class_member_mask)[0]
-                cls_uncertainty = uncertainty_score[cls_indices]
-                cls_uncertainty_order = np.argsort(-cls_uncertainty)
-                num_samples = min(len(cls_uncertainty_order), num_query_samples_per_class)
-                cls_uncertain_indices = cls_indices[cls_uncertainty_order[:num_samples]]
-                uncertain_sample_indices.extend(cls_uncertain_indices.tolist())
+                for c in range(num_classes):
+                    # Get indices of samples predicted to belong to class c
+                    class_member_mask = predicted_labels == c
+                    cls_indices = np.where(class_member_mask)[0]
+                    cls_uncertainty = uncertainty_score[cls_indices]
+                    cls_uncertainty_order = np.argsort(-cls_uncertainty)
+                    num_samples = min(len(cls_uncertainty_order), num_query_samples_per_class)
+                    cls_uncertain_indices = cls_indices[cls_uncertainty_order[:num_samples]]
+                    uncertain_sample_indices.extend(cls_uncertain_indices.tolist())
 
-            # Handle any remaining samples to meet the total query quota
-            total_selected = len(uncertain_sample_indices)
-            if total_selected < num_query_samples:
-                remaining_samples = num_query_samples - total_selected
-                selected_set = set(uncertain_sample_indices)
-                remaining_indices = [i for i in range(len(unlabeled_indices)) if i not in selected_set]
-                remaining_uncertainty = uncertainty_score[remaining_indices]
-                remaining_uncertainty_order = np.argsort(-remaining_uncertainty)
-                additional_uncertain_indices = [remaining_indices[i] for i in remaining_uncertainty_order[:remaining_samples]]
-                uncertain_sample_indices.extend(additional_uncertain_indices)
-            elif total_selected > num_query_samples:
-                uncertain_sample_indices = uncertain_sample_indices[:num_query_samples]
+                # Handle any remaining samples to meet the total query quota
+                total_selected = len(uncertain_sample_indices)
+                if total_selected < num_query_samples:
+                    remaining_samples = num_query_samples - total_selected
+                    selected_set = set(uncertain_sample_indices)
+                    remaining_indices = [i for i in range(len(unlabeled_indices)) if i not in selected_set]
+                    remaining_uncertainty = uncertainty_score[remaining_indices]
+                    remaining_uncertainty_order = np.argsort(-remaining_uncertainty)
+                    additional_uncertain_indices = [remaining_indices[i] for i in remaining_uncertainty_order[:remaining_samples]]
+                    uncertain_sample_indices.extend(additional_uncertain_indices)
+                elif total_selected > num_query_samples:
+                    uncertain_sample_indices = uncertain_sample_indices[:num_query_samples]
 
-            # Map back to dataset indices
-            uncertain_sample_dataset_indices = np.array(unlabeled_indices)[uncertain_sample_indices]
-            oracle_annotation_labels = unlabeled_ground_truth[uncertain_sample_indices]
-            all_labels[uncertain_sample_dataset_indices] = oracle_annotation_labels.flatten()
-        else:
-            uncertainty_order = np.argsort(-uncertainty_score)
-            uncertain_indices = uncertainty_order[:num_query_samples]
-            uncertain_sample_indices = np.array(unlabeled_indices)[uncertain_indices]
-            oracle_annotation_labels = unlabeled_ground_truth[uncertain_indices]
-            all_labels[uncertain_sample_indices] = oracle_annotation_labels
+                # Map back to dataset indices
+                uncertain_sample_dataset_indices = np.array(unlabeled_indices)[uncertain_sample_indices]
+                oracle_annotation_labels = unlabeled_ground_truth[uncertain_sample_indices]
+                all_labels[uncertain_sample_dataset_indices] = oracle_annotation_labels.flatten()
+            else:
+                uncertainty_order = np.argsort(-uncertainty_score)
+                uncertain_indices = uncertainty_order[:num_query_samples]
+                uncertain_sample_indices = np.array(unlabeled_indices)[uncertain_indices]
+                oracle_annotation_labels = unlabeled_ground_truth[uncertain_indices]
+                all_labels[uncertain_sample_indices] = oracle_annotation_labels
 
-        np.save(f"{dataset_name}_{uncertainty}_labels.npy", all_labels)
+            np.save(f"{dataset_name}_{uncertainty}_labels.npy", all_labels)
 
-        # labeling accuracy after first AL round
-        updated_unlabeled_labels = all_labels[unlabeled_indices]
-        corrects = np.sum(updated_unlabeled_labels == unlabeled_ground_truth)
-        new_labeling_acc = corrects / len(unlabeled_ground_truth)
-        print(f"Labeling Accuracy after first AL round: {new_labeling_acc * 100:.2f}%")
+            # labeling accuracy after first AL round
+            updated_unlabeled_labels = all_labels[unlabeled_indices]
+            corrects = np.sum(updated_unlabeled_labels == unlabeled_ground_truth)
+            new_labeling_acc = corrects / len(unlabeled_ground_truth)
+            print(f"Labeling Accuracy after first AL round: {new_labeling_acc * 100:.2f}%")
     
     train_dataset.targets = all_labels.tolist()
 
