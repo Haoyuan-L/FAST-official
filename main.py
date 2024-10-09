@@ -102,7 +102,7 @@ def run_with_different_configs(yaml_config_file):
         torch.cuda.manual_seed(config["seed"])
         np.random.seed(config["seed"])
         # Run the experiment with current configuration
-        history = run_experiment(num_rounds=config["num_rounds"], num_clients=config["num_clients"],
+        history = run_experiment(num_rounds=config["num_rounds"], num_clients=config["num_clients"], model=config["model"],
                                  data_split=config["data_split"], participation=config["participation"],
                                  max_parallel_executions=config["max_parallel_executions"], dataset=config["dataset"],
                                  skewness_alpha=config["skewness_alpha"], class_aware=config["class_aware"], uncertainty=config["uncertainty"])
