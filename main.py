@@ -39,13 +39,13 @@ def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split
     def create_client(cid):
         time.sleep(int(cid) * 0.75)
         return Client(cid=int(cid), dataset=dataset, model_loader=network_fn, embed_input=embed_input,
-                      data_loader=lambda: get_data(dataset_name=dataset, id=cid, num_clients=num_clients, embed_input=embed_input,
+                      data_loader=lambda: get_data(dataset_name=dataset, id=cid, num_clients=num_clients, embed_input=embed_input, active_oracle=active_oracle,
                                                    split=data_split, alpha=skewness_alpha, class_aware=class_aware, uncertainty=uncertainty))
 
     def create_server(init_model=None):
         return Server(num_rounds=num_rounds, num_clients=num_clients, embed_input=embed_input,
                       participation=participation, model_loader=network_fn, dataset=dataset, 
-                      data_loader=lambda: get_data(dataset_name=dataset, embed_input=embed_input, split=data_split, alpha=skewness_alpha, return_eval_ds=True), 
+                      data_loader=lambda: get_data(dataset_name=dataset, embed_input=embed_input, active_oracle=active_oracle, split=data_split, alpha=skewness_alpha, return_eval_ds=True), 
                       init_model=init_model)
     ray.shutdown()
     ray.init()
