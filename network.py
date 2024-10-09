@@ -163,28 +163,22 @@ def ResNet152(num_classes=10):
 class LinearModelMulti(torch.nn.Module):
     def __init__(self, hidden_size, num_classes=1, dropout_rate=0.3):
         super().__init__()
-        print(hidden_size)
-        self.linear = torch.nn.Sequential(torch.nn.BatchNorm1d(hidden_size[0], affine=False, eps=1e-6), 
+        self.linear = torch.nn.Sequential(torch.nn.BatchNorm1d(hidden_size, affine=False, eps=1e-6), 
                                             torch.nn.Dropout(p=dropout_rate),
-                                            torch.nn.Linear(hidden_size[0], hidden_size[1]),
-                                            torch.nn.BatchNorm1d(hidden_size[1], affine=False, eps=1e-6),
+                                            torch.nn.Linear(hidden_size, hidden_size),
+                                            torch.nn.BatchNorm1d(hidden_size, affine=False, eps=1e-6),
                                             torch.nn.Dropout(p=dropout_rate),
-                                            torch.nn.Linear(hidden_size[1], num_classes))
+                                            torch.nn.Linear(hidden_size, num_classes))
     def forward(self, x):
         return self.linear(x)
 
-class LinearModel(nn.Module):
-    def __init__(self, hidden_size, num_classes=1, dropout_rate=0.3):
-        super().__init__()
-        self.batchnorm = nn.BatchNorm1d(hidden_size, affine=False, eps=1e-6)
-        self.dropout = nn.Dropout(p=dropout_rate)
-        self.linear = nn.Linear(hidden_size, num_classes)
+class LinearProbe(nn.Module):
+    def __init__(self, embedding_dim, num_classes):
+        super(LinearProbe, self).__init__()
+        self.fc = nn.Linear(embedding_dim, num_classes)
 
     def forward(self, x):
-        x = self.batchnorm(x)
-        x = self.dropout(x)
-        x = self.linear(x)
-        return x
+        return self.fc(x)
     
 """ Helper function to get the network model """
 
@@ -207,7 +201,7 @@ def get_linear_network(input_shape, num_classes, weights_fp=None):
     Initializes the LinearClassifier model.
     """
     emb_dim = input_shape[0]
-    model = LinearModelMulti(hidden_size=emb_dim, num_classes=num_classes)
+    model = LinearProbe(embedding_dim=emb_dim, num_classes=num_classes)
     if weights_fp is not None:
         model.load_state_dict(torch.load(weights_fp))
     return model
