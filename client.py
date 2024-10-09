@@ -6,11 +6,25 @@ import torch.optim as optim
 
 class Client(fl.client.NumPyClient):
 
-	def __init__(self, cid, dataset, model_loader, data_loader, device='cuda'):
+	def __init__(self, cid, dataset, model_loader, data_loader, embed_input=False, device='cuda'):
 		self.cid = cid
 		self.data, self.num_classes, self.num_samples = data_loader()
-		self.input_shape = self.get_dataset_config(dataset)
+		# Determine input shape based on embed_input flag
+		if self.embed_input:
+			try:
+				first_batch = next(iter(self.data))
+				first_embedding = first_batch[0]
+				if isinstance(first_embedding, torch.Tensor):
+					emb_dim = first_embedding.shape[-1]
+					self.input_shape = (emb_dim,)
+				else:
+					raise ValueError("Expected embedding to be a torch.Tensor")
+			except StopIteration:
+				raise ValueError("DataLoader is empty. Cannot determine embedding dimension.")
+		else:
+			self.input_shape = self.get_dataset_config(dataset)
 		self.model_loader = model_loader
+		self.embed_input = embed_input
 		self.device = device
 
 	def set_parameters(self, parameters, config):

@@ -1,11 +1,12 @@
 import numpy as np
 import time
 import GPUtil
-import torch
 import os
 import random
 import math
 import pickle
+import torch
+from torch.utils.data import Dataset
 from torchvision.datasets.vision import VisionDataset
 from torchvision.datasets.folder import default_loader
 from torchvision.datasets.utils import (
@@ -302,3 +303,19 @@ def make_dataset(root, split, class_to_idx):
         raise ValueError(f"Invalid split: {split}. Expected 'train' or 'val'.")
 
     return images
+
+class EmbeddingDataset(Dataset):
+    def __init__(self, embeddings, labels):
+        """
+        Args:
+            embeddings (torch.Tensor): Tensor of embeddings with shape (N, emb_dim).
+            labels (np.ndarray): Array of labels with shape (N,).
+        """
+        self.embeddings = embeddings
+        self.labels = torch.from_numpy(labels).long()
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        return self.embeddings[idx], self.labels[idx]

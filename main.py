@@ -23,18 +23,28 @@ from client import Client
 from server import Server
 
 def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split='iid', max_parallel_executions=5,
-                   timeout=1500, init_model=None, dataset="cifar10", skewness_alpha=None, class_aware=False, uncertainty="norm"):
+                   timeout=1500, init_model=None, dataset="cifar10", skewness_alpha=None, class_aware=False, uncertainty="norm", model="resnet18"):
 
+    if model == "resnet18":
+        network_fn = network.get_resnet18_network
+    elif model == "cnn4":
+        network_fn = network.get_cnn4_network
+    elif model == "linear":
+        network_fn = network.get_linear_network
+        embed_input = True
+    else:
+        raise NotImplementedError(f"Model '{model}' is not supported.") 
+    
     def create_client(cid):
         time.sleep(int(cid) * 0.75)
-        return Client(cid=int(cid), dataset=dataset, model_loader=network.get_cnn4_network,
-                      data_loader=lambda: get_data(dataset_name=dataset, id=cid, num_clients=num_clients, 
+        return Client(cid=int(cid), dataset=dataset, model_loader=network_fn, embed_input=embed_input,
+                      data_loader=lambda: get_data(dataset_name=dataset, id=cid, num_clients=num_clients, embed_input=embed_input,
                                                    split=data_split, alpha=skewness_alpha, class_aware=class_aware, uncertainty=uncertainty))
 
     def create_server(init_model=None):
-        return Server(num_rounds=num_rounds, num_clients=num_clients, participation=participation,
-                      model_loader=network.get_cnn4_network, dataset=dataset, 
-                      data_loader=lambda: get_data(dataset_name=dataset, split=data_split, alpha=skewness_alpha, return_eval_ds=True), 
+        return Server(num_rounds=num_rounds, num_clients=num_clients, embed_input=embed_input,
+                      participation=participation, model_loader=network.get_cnn4_network, dataset=dataset, 
+                      data_loader=lambda: get_data(dataset_name=dataset, embed_input=embed_input, split=data_split, alpha=skewness_alpha, return_eval_ds=True), 
                       init_model=init_model)
     ray.shutdown()
     ray.init()

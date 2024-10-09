@@ -8,14 +8,26 @@ from utils import get_learning_rate
 
 class Server(fl.server.Server):
 
-	def __init__(self, dataset, model_loader, data_loader, num_rounds, num_clients=10,
+	def __init__(self, dataset, model_loader, data_loader, num_rounds, num_clients=10, embed_input=False,
 		participation=1.0, init_model=None, log_level=logging.INFO,
 		initial_lr=1e-3, decay_factor=0.1, num_decays=3):
 
 		self.num_rounds = num_rounds
 		self.data_loader = data_loader
 		self.data, self.num_classes, self.num_samples = data_loader()
-		self.input_shape = self.get_dataset_config(dataset)
+		if self.embed_input:
+			try:
+				first_batch = next(iter(self.data))
+				first_embedding = first_batch[0]
+				if isinstance(first_embedding, torch.Tensor):
+					emb_dim = first_embedding.shape[-1]
+					self.input_shape = (emb_dim,)
+				else:
+					raise ValueError("Expected embedding to be a torch.Tensor")
+			except StopIteration:
+				raise ValueError("DataLoader is empty. Cannot determine embedding dimension.")
+		else:
+			self.input_shape = self.get_dataset_config(dataset)
 		self.model_loader = model_loader
 		self.init_model = init_model
 		self.initial_lr = initial_lr
@@ -28,6 +40,7 @@ class Server(fl.server.Server):
 		self._client_manager = fl.server.client_manager.SimpleClientManager()
 		self.max_workers = None
 		self.set_strategy(self)
+		self.embed_input = embed_input
 		logging.getLogger("flower").setLevel(log_level)
 
 	def set_max_workers(self, *args, **kwargs):
@@ -99,13 +112,6 @@ class Server(fl.server.Server):
 			logging.info(f"Round {rnd}: Setting client learning rate to {current_lr}")
 			return client_config
 		return config_fn
-
-	def get_client_config_fn(self):
-		" Define fit config function with constant self objects."
-		def get_on_fit_config_fn(rnd):
-			self.clients_config["round"] = rnd
-			return self.clients_config
-		return get_on_fit_config_fn
 
 	@staticmethod
 	def evaluate(ds, model, num_classes, metrics=None, loss=torch.nn.CrossEntropyLoss(), verbose=False):

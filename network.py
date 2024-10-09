@@ -160,6 +160,18 @@ def ResNet101(num_classes=10):
 def ResNet152(num_classes=10):
     return ResNet(Bottleneck, [3, 8, 36, 3], num_classes=num_classes)
 
+class LinearClassifier(nn.Module):
+    def __init__(self, emb_dim, num_classes):
+        super(LinearClassifier, self).__init__()
+        self.linear = nn.Linear(emb_dim, num_classes)
+        self.linear.bias.data.fill_(0)  # Initialize biases to zero
+
+    def forward(self, x):
+        logits = self.linear(x)
+        return logits
+    
+""" Helper function to get the network model """
+
 def get_resnet18_network(num_classes=10, weights_fp=None):
     model = ResNet18(num_classes=num_classes)
     if weights_fp is not None:
@@ -170,6 +182,16 @@ def get_cnn4_network(input_shape, num_classes, weights_fp=None):
     in_channels = input_shape[0]
     img_size = input_shape[1]
     model = CNN4Conv(in_channels, num_classes, img_size)
+    if weights_fp is not None:
+        model.load_state_dict(torch.load(weights_fp))
+    return model
+
+def get_linear_network(input_shape, num_classes, weights_fp=None):
+    """
+    Initializes the LinearClassifier model.
+    """
+    emb_dim = input_shape[0]
+    model = LinearClassifier(emb_dim, num_classes)
     if weights_fp is not None:
         model.load_state_dict(torch.load(weights_fp))
     return model

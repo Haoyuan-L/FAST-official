@@ -136,7 +136,7 @@ def get_logits_from_knn(k, indices, labeled_labels, num_classes):
         logits.append(logit)
     return np.array(logits)
 
-def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, 
+def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, embed_input=False,
              split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm"):
 
     # load the OpenCLIP model
@@ -146,6 +146,12 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     model.eval()
     if not os.path.exists(data_dir):
         os.mkdir(data_dir)
+    # Path and file names for embeddings and labels
+    save_path = "./embeddings/"
+    labeled_embeddings_fname = f"{dataset_name}_embeddings_labeled.pt"
+    unlabeled_embeddings_fname = f"{dataset_name}_embeddings_unlabeled.pt"
+    labeled_labels_fname = f"{dataset_name}_labeled_labels.npy"
+    unlabeled_labels_fname = f"{dataset_name}_unlabeled_labels.npy"
     
     # Choose dataset based on the provided name
     if dataset_name.lower() == "cifar10":
@@ -221,11 +227,6 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
 
         # Utilize SIGLIP encoder to encode all the training data
         # Load the embeddings if they exist
-        save_path = "./embeddings/"
-        labeled_embeddings_fname = f"{dataset_name}_embeddings_labeled.pt"
-        unlabeled_embeddings_fname = f"{dataset_name}_embeddings_unlabeled.pt"
-        labeled_labels_fname = f"{dataset_name}_labeled_labels.npy"
-        unlabeled_labels_fname = f"{dataset_name}_unlabeled_labels.npy"
 
         if os.path.exists(save_path + labeled_embeddings_fname):
             labeled_embeddings = torch.load(save_path + labeled_embeddings_fname)
@@ -331,10 +332,41 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         print(f"Labeling Accuracy after first AL round: {new_labeling_acc * 100:.2f}%")
     
     train_dataset.targets = all_labels.tolist()
+
+    # Handle embedding of test dataset if embed_input is True
+    if embed_input:
+        # Filenames for test embeddings and labels
+        test_embeddings_fname = f"{dataset_name}_embeddings_test.pt"
+        test_labels_fname = f"{dataset_name}_test_labels.npy"
+        
+        # Check if test embeddings already exist
+        if os.path.exists(os.path.join(save_path, test_embeddings_fname)):
+            test_embeddings = torch.load(os.path.join(save_path, test_embeddings_fname))
+            test_labels = np.load(os.path.join(save_path, test_labels_fname))
+        else:
+            # Create a subset of the test_dataset to encode all test samples
+            test_subset = torch.utils.data.Subset(test_dataset, list(range(len(test_dataset))))
+            test_embeddings, test_labels = get_embeddings(
+                test_subset, model, device, 
+                fname=test_embeddings_fname, 
+                lname=test_labels_fname, 
+                batch_size=batch_size, 
+                save_path=save_path
+            )
+        
+        # Convert embeddings and labels to numpy arrays if they are not already
+        test_embeddings = test_embeddings.numpy().astype('float32')
+        test_labels = test_labels.flatten()
+
     # Return evaluation dataset if required
     if return_eval_ds:
-        eval_loader = DataLoader(test_dataset, batch_size=batch_size * 4, shuffle=False, num_workers=num_workers)
-        num_samples = len(test_dataset)
+        if embed_input:
+            test_dataset_embeddings = EmbeddingDataset(torch.from_numpy(test_embeddings), test_labels)
+            eval_loader = DataLoader(test_dataset_embeddings, batch_size=batch_size * 4, shuffle=False, num_workers=num_workers)
+            num_samples = len(test_dataset_embeddings)
+        else:
+            eval_loader = DataLoader(test_dataset, batch_size=batch_size * 4, shuffle=False, num_workers=num_workers)
+            num_samples = len(test_dataset)
         return eval_loader, num_classes, num_samples
     else:
         if split == "dir_balance":
@@ -350,16 +382,30 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             )
             # Get the train indices for the specific client
             train_indices = clients_data[int(id)]
-            # Create a subset of the train dataset for the client
-            train_dataset = torch.utils.data.Subset(train_dataset, train_indices)
         else:
             split_fn = get_split_fn(split)
             # Split data into client-specific subsets
             train_indices = split_fn(idxs=train_dataset.targets, num_shards=num_clients,
                                     num_samples=len(train_dataset), num_classes=num_classes, seed=seed)[int(id)]
+            
+        if embed_input:
+            labeled_embeddings = torch.load(os.path.join(save_path, labeled_embeddings_fname)).numpy().astype('float32')
+            unlabeled_embeddings = torch.load(os.path.join(save_path, unlabeled_embeddings_fname)).numpy().astype('float32')
+            all_train_embeddings = np.concatenate((labeled_embeddings, unlabeled_embeddings), axis=0)
+            
+            # Load all labels
+            all_labels = np.array(train_dataset.targets)
+            subset_embeddings = all_train_embeddings[train_indices]
+            subset_labels = all_labels[train_indices]
+            
+            # Create EmbeddingDataset and Dataloader for the client's data
+            train_dataset_embeddings = EmbeddingDataset(torch.from_numpy(subset_embeddings), subset_labels)
+            train_loader = DataLoader(train_dataset_embeddings, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+            num_samples = len(train_indices)
+        else:
+            # Create a subset of the train dataset for the client
             train_dataset = torch.utils.data.Subset(train_dataset, train_indices)
-
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
-        num_samples = len(train_indices)
+            train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+            num_samples = len(train_indices)
 
         return train_loader, num_classes, num_samples
