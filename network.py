@@ -163,13 +163,12 @@ def ResNet152(num_classes=10):
 class LinearModelMulti(torch.nn.Module):
     def __init__(self, hidden_size, num_classes=1, dropout_rate=0.3):
         super().__init__()
-        print(hidden_size)
-        self.linear = torch.nn.Sequential(torch.nn.BatchNorm1d(hidden_size[0], affine=False, eps=1e-6), 
+        self.linear = torch.nn.Sequential(torch.nn.BatchNorm1d(hidden_size, affine=False, eps=1e-6), 
                                             torch.nn.Dropout(p=dropout_rate),
-                                            torch.nn.Linear(hidden_size[0], hidden_size[1]),
-                                            torch.nn.BatchNorm1d(hidden_size[1], affine=False, eps=1e-6),
+                                            torch.nn.Linear(hidden_size, hidden_size),
+                                            torch.nn.BatchNorm1d(hidden_size, affine=False, eps=1e-6),
                                             torch.nn.Dropout(p=dropout_rate),
-                                            torch.nn.Linear(hidden_size[1], num_classes))
+                                            torch.nn.Linear(hidden_size, num_classes))
     def forward(self, x):
         return self.linear(x)
 
