@@ -44,7 +44,7 @@ def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split
 
     def create_server(init_model=None):
         return Server(num_rounds=num_rounds, num_clients=num_clients, embed_input=embed_input,
-                      participation=participation, model_loader=network.get_cnn4_network, dataset=dataset, 
+                      participation=participation, model_loader=network_fn, dataset=dataset, 
                       data_loader=lambda: get_data(dataset_name=dataset, embed_input=embed_input, split=data_split, alpha=skewness_alpha, return_eval_ds=True), 
                       init_model=init_model)
     ray.shutdown()
