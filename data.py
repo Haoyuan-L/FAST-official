@@ -159,6 +159,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             train_dataset = CIFAR10(root=data_dir, train=True, download=True, transform=get_transforms(dataset_name, augmentation=True))
             train_dataset_for_embeddings = CIFAR10(root=data_dir, train=True, download=True, transform=preprocess)
             test_dataset = CIFAR10(root=data_dir, train=False, download=True, transform=get_transforms(dataset_name, augmentation=False))
+            test_dataset_for_embeddings = CIFAR10(root=data_dir, train=False, download=True, transform=preprocess)
         num_classes = 10
 
     elif dataset_name.lower() == "svhn":
@@ -166,6 +167,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             train_dataset = SVHN(root=data_dir, split='train', download=True, transform=get_transforms(dataset_name, augmentation=True))
             train_dataset_for_embeddings = SVHN(root=data_dir, split='train', download=True, transform=preprocess)
             test_dataset = SVHN(root=data_dir, split='test', download=True, transform=get_transforms(dataset_name, augmentation=False))
+            test_dataset_for_embeddings = SVHN(root=data_dir, split='test', download=True, transform=preprocess)
         num_classes = 10
 
     elif dataset_name.lower() == "pathmnist":
@@ -173,6 +175,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             train_dataset = PathMNIST(root=data_dir, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
             train_dataset_for_embeddings = PathMNIST(root=data_dir, split="train", download=True, transform=preprocess)
             test_dataset = PathMNIST(root=data_dir, split="test", download=True, transform=get_transforms(dataset_name, augmentation=False))
+            test_dataset_for_embeddings = PathMNIST(root=data_dir, split="test", download=True, transform=preprocess)
         num_classes = 9
 
     elif dataset_name.lower() == "dermamnist":
@@ -180,6 +183,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             train_dataset = DermaMNIST(root=data_dir, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
             train_dataset_for_embeddings = DermaMNIST(root=data_dir, split="train", download=True, transform=preprocess)
             test_dataset = DermaMNIST(root=data_dir, split="test", download=True, transform=get_transforms(dataset_name, augmentation=False))
+            test_dataset_for_embeddings = DermaMNIST(root=data_dir, split="test", download=True, transform=preprocess)
         num_classes = 7
 
     elif dataset_name.lower() == "cifar100":
@@ -187,6 +191,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             train_dataset = CIFAR100(root=data_dir, train=True, download=True, transform=get_transforms(dataset_name, augmentation=True))
             train_dataset_for_embeddings = CIFAR100(root=data_dir, train=True, download=True, transform=preprocess)
             test_dataset = CIFAR100(root=data_dir, train=False, download=True, transform=get_transforms(dataset_name, augmentation=False))
+            test_dataset_for_embeddings = CIFAR100(root=data_dir, train=False, download=True, transform=preprocess)
         num_classes = 100
     
     elif dataset_name.lower() == "tiny-imagenet":
@@ -194,6 +199,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             train_dataset = TinyImageNet(root=data_dir, split="train", download=True, transform=get_transforms(dataset_name, augmentation=True))
             train_dataset_for_embeddings = TinyImageNet(root=data_dir, split="train", download=True, transform=preprocess)
             test_dataset = TinyImageNet(root=data_dir, split="val", download=True, transform=get_transforms(dataset_name, augmentation=False))
+            test_dataset_for_embeddings = TinyImageNet(root=data_dir, split="val", download=True, transform=preprocess)
         num_classes = 200
     else:
         raise ValueError(f"Dataset {dataset_name} is not supported.")
@@ -345,7 +351,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             test_labels = np.load(os.path.join(save_path, test_labels_fname))
         else:
             # Create a subset of the test_dataset to encode all test samples
-            test_subset = torch.utils.data.Subset(test_dataset, list(range(len(test_dataset))))
+            test_subset = torch.utils.data.Subset(test_dataset_for_embeddings, list(range(len(test_dataset_for_embeddings))))
             test_embeddings, test_labels = get_embeddings(
                 test_subset, model, device, 
                 fname=test_embeddings_fname, 
