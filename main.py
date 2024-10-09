@@ -24,7 +24,8 @@ from server import Server
 
 def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split='iid', max_parallel_executions=5,
                    timeout=1500, init_model=None, dataset="cifar10", skewness_alpha=None, class_aware=False, uncertainty="norm", model="resnet18"):
-
+    
+    embed_input = False
     if model == "resnet18":
         network_fn = network.get_resnet18_network
     elif model == "cnn4":
