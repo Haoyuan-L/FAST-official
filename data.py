@@ -110,7 +110,7 @@ def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_pat
             all_labels.append(labels)
 
     all_embeddings = torch.cat(all_embeddings)
-    labels = torch.cat(labels)
+    all_labels = torch.cat(all_labels)
 
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
