@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import contextlib
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 from medmnist.dataset import PathMNIST, DermaMNIST
 from torchvision.datasets import CIFAR10, SVHN, CIFAR100
 import torchvision.transforms as transforms
@@ -343,12 +343,12 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     if embed_input:
         # Filenames for test embeddings and labels
         test_embeddings_fname = f"{dataset_name}_embeddings_test.pt"
-        test_labels_fname = f"{dataset_name}_test_labels.npy"
+        test_labels_fname = f"{dataset_name}_test_labels.pt"
         
         # Check if test embeddings already exist
         if os.path.exists(os.path.join(save_path, test_embeddings_fname)):
             test_embeddings = torch.load(os.path.join(save_path, test_embeddings_fname))
-            test_labels = np.load(os.path.join(save_path, test_labels_fname))
+            test_labels = torch.load(os.path.join(save_path, test_labels_fname))
         else:
             # Create a subset of the test_dataset to encode all test samples
             test_subset = torch.utils.data.Subset(test_dataset_for_embeddings, list(range(len(test_dataset_for_embeddings))))
@@ -367,7 +367,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     # Return evaluation dataset if required
     if return_eval_ds:
         if embed_input:
-            test_dataset_embeddings = EmbeddingDataset(torch.from_numpy(test_embeddings), test_labels)
+            test_dataset_embeddings = TensorDataset(torch.from_numpy(test_embeddings), test_labels)
             eval_loader = DataLoader(test_dataset_embeddings, batch_size=batch_size * 4, shuffle=False, num_workers=num_workers)
             num_samples = len(test_dataset_embeddings)
         else:
@@ -402,7 +402,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             subset_labels = all_labels[train_indices]
             
             # Create EmbeddingDataset and Dataloader for the client's data
-            train_dataset_embeddings = EmbeddingDataset(torch.from_numpy(subset_embeddings), subset_labels)
+            train_dataset_embeddings = TensorDataset(torch.from_numpy(subset_embeddings), subset_labels)
             train_loader = DataLoader(train_dataset_embeddings, batch_size=batch_size, num_workers=num_workers, shuffle=True)
             num_samples = len(train_indices)
         else:
