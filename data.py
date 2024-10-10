@@ -115,7 +115,7 @@ def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_pat
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         torch.save(embeddings, save_path+fname)
-        torch.save(save_path+lname, labels)
+        torch.save(labels, save_path+lname)
     return all_embeddings, labels
 
 def get_logits_from_knn(k, indices, labeled_labels, num_classes):
@@ -150,7 +150,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     save_path = "./embeddings/"
     # Define filenames for embeddings and labels
     train_embeddings_fname = f"{dataset_name}_embeddings_train.pt"
-    train_labels_fname = f"{dataset_name}_train_labels.npy"
+    train_labels_fname = f"{dataset_name}_train_labels.pt"
     
     # Choose dataset based on the provided name
     if dataset_name.lower() == "cifar10":
@@ -232,7 +232,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
 
         if os.path.exists(os.path.join(save_path, train_embeddings_fname)):
             train_embeddings = torch.load(os.path.join(save_path, train_embeddings_fname))
-            train_labels = np.load(os.path.join(save_path, train_labels_fname))
+            train_labels = torch.load(os.path.join(save_path, train_labels_fname))
         else:
             train_embeddings, train_labels = get_embeddings(
                 train_dataset_for_embeddings, model, device, fname=train_embeddings_fname, lname=train_labels_fname, batch_size=batch_size, save_path=save_path
