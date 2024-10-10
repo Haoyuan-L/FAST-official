@@ -2,43 +2,25 @@ experiments:
   - dataset: "cifar10"
     num_rounds: 100
     num_clients: 10
-    data_split: "dir_balance"
+    data_split: "iid"
+    participation: 1.0
+    max_parallel_executions: 5
+    skewness_alpha: 0.1
+    seed: 1
+    class_aware: True
+    uncertainty: "None"
+    model: "linear"
+    active_oracle: False
+
+  - dataset: "cifar10"
+    num_rounds: 100
+    num_clients: 10
+    data_split: "iid"
     participation: 1.0
     max_parallel_executions: 5
     skewness_alpha: 0.1
     seed: 1
     class_aware: True
     uncertainty: "norm"
-
-  # - dataset: "cifar10"
-  #   num_rounds: 100
-  #   num_clients: 10
-  #   data_split: "iid"
-  #   participation: 1.0
-  #   max_parallel_executions: 6
-  #   skewness_alpha: 0.1
-  #   seed: 1
-  #   class_aware: True
-  #   uncertainty: "norm"
-
-  # - dataset: "cifar10"
-  #   num_rounds: 100
-  #   num_clients: 10
-  #   data_split: "iid"
-  #   participation: 1.0
-  #   max_parallel_executions: 6
-  #   skewness_alpha: 0.1
-  #   seed: 1
-  #   class_aware: True
-  #   uncertainty: "norm"
-
-  # - dataset: "cifar10"
-  #   num_rounds: 100
-  #   num_clients: 10
-  #   data_split: "iid"
-  #   participation: 1.0
-  #   max_parallel_executions: 6
-  #   skewness_alpha: 0.1
-  #   seed: 1
-  #   class_aware: True
-  #   uncertainty: "norm"
+    model: "linear"   
+    active_oracle: True
