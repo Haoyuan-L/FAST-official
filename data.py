@@ -116,7 +116,7 @@ def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_pat
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         torch.save(all_embeddings, save_path+fname)
         torch.save(all_labels, save_path+lname)
-    return all_embeddings, labels
+    return all_embeddings, all_labels
 
 def get_logits_from_knn(k, indices, labeled_labels, num_classes):
     logits = []
