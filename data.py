@@ -397,12 +397,12 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         if embed_input:
             train_embeddings = torch.load(os.path.join(save_path, train_embeddings_fname)).numpy().astype('float32')
             # Load all labels
-            all_labels = np.array(train_dataset.targets)
+            all_labels = torch.tensor(train_dataset.targets, dtype=torch.long)
             subset_embeddings = train_embeddings[train_indices]
             subset_labels = all_labels[train_indices]
             
             # Create EmbeddingDataset and Dataloader for the client's data
-            train_dataset_embeddings = TensorDataset(torch.from_numpy(subset_embeddings), subset_labels)
+            train_dataset_embeddings = TensorDataset(subset_embeddings, subset_labels)
             train_loader = DataLoader(train_dataset_embeddings, batch_size=batch_size, num_workers=num_workers, shuffle=True)
             num_samples = len(train_indices)
         else:
