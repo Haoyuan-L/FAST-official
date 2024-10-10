@@ -100,23 +100,23 @@ def compute_largest_margin(logits):
 
 def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_path=None):
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-    embeddings = []
-    labels = []
+    all_embeddings = []
+    all_labels = []
     with torch.no_grad():
-        for images, targets in dataloader:
+        for images, labels in dataloader:
             images = images.to(device)
-            # Obtain image embeddings
-            features = model.encode_image(images)
-            embeddings.append(features.cpu())
-            labels.extend(targets.numpy())
-    embeddings = torch.cat(embeddings)
-    labels = np.array(labels)
+            embeddings = model.encode_image(images).float()
+            all_embeddings.append(embeddings.cpu())
+            all_labels.append(labels)
+
+    all_embeddings = torch.cat(all_embeddings)
+    labels = torch.cat(labels)
 
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         torch.save(embeddings, save_path+fname)
-        np.save(save_path+lname, labels)
-    return embeddings, labels
+        torch.save(save_path+lname, labels)
+    return all_embeddings, labels
 
 def get_logits_from_knn(k, indices, labeled_labels, num_classes):
     logits = []
@@ -148,10 +148,9 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         os.mkdir(data_dir)
     # Path and file names for embeddings and labels
     save_path = "./embeddings/"
-    labeled_embeddings_fname = f"{dataset_name}_embeddings_labeled.pt"
-    unlabeled_embeddings_fname = f"{dataset_name}_embeddings_unlabeled.pt"
-    labeled_labels_fname = f"{dataset_name}_labeled_labels.npy"
-    unlabeled_labels_fname = f"{dataset_name}_unlabeled_labels.npy"
+    # Define filenames for embeddings and labels
+    train_embeddings_fname = f"{dataset_name}_embeddings_train.pt"
+    train_labels_fname = f"{dataset_name}_train_labels.npy"
     
     # Choose dataset based on the provided name
     if dataset_name.lower() == "cifar10":
@@ -228,43 +227,41 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         all_indices = set(range(total_samples))
         unlabeled_indices = list(all_indices - set(labeled_indices))
 
-        labeled_subset = torch.utils.data.Subset(train_dataset_for_embeddings, labeled_indices)
-        unlabeled_subset = torch.utils.data.Subset(train_dataset_for_embeddings, unlabeled_indices)
-
         # Utilize SIGLIP encoder to encode all the training data
         # Load the embeddings if they exist
 
-        if os.path.exists(save_path + labeled_embeddings_fname):
-            labeled_embeddings = torch.load(save_path + labeled_embeddings_fname)
-            labeled_labels = np.load(save_path + labeled_labels_fname)
+        if os.path.exists(os.path.join(save_path, train_embeddings_fname)):
+            train_embeddings = torch.load(os.path.join(save_path, train_embeddings_fname))
+            train_labels = np.load(os.path.join(save_path, train_labels_fname))
         else:
-            labeled_embeddings, labeled_labels = get_embeddings(
-                labeled_subset, model, device, fname=labeled_embeddings_fname, lname=labeled_labels_fname, batch_size=batch_size, save_path=save_path
+            train_embeddings, train_labels = get_embeddings(
+                train_dataset_for_embeddings, model, device, fname=train_embeddings_fname, lname=train_labels_fname, batch_size=batch_size, save_path=save_path
             )
-        if os.path.exists(save_path + unlabeled_embeddings_fname):
-            unlabeled_embeddings = torch.load(save_path + unlabeled_embeddings_fname)
-            unlabled_ground_truth = np.load(save_path + unlabeled_labels_fname)
-        else:
-            unlabeled_embeddings, unlabled_ground_truth = get_embeddings(
-                unlabeled_subset, model, device, fname=unlabeled_embeddings_fname, lname=unlabeled_labels_fname, batch_size=batch_size, save_path=save_path
-            )
+        
+        # Use indices to extract labeled and unlabeled embeddings and labels
+        labeled_embeddings = train_embeddings[labeled_indices]
+        labeled_labels = train_labels[labeled_indices]
+        unlabeled_embeddings = train_embeddings[unlabeled_indices]
+        unlabeled_ground_truth = train_labels[unlabeled_indices]
 
-        # Apply FAISS-KNN to embedings for data labeling
-        labeled_embeddings = labeled_embeddings.numpy().astype('float32')
-        unlabeled_embeddings = unlabeled_embeddings.numpy().astype('float32')
+        # Apply FAISS-KNN to embeddings for data labeling
+        labeled_embeddings_np = labeled_embeddings.numpy().astype('float32')
+        unlabeled_embeddings_np = unlabeled_embeddings.numpy().astype('float32')
 
-        index = faiss.IndexFlatL2(labeled_embeddings.shape[1])
-        index.add(labeled_embeddings)
+        index = faiss.IndexFlatL2(labeled_embeddings_np.shape[1])
+        index.add(labeled_embeddings_np)
         k = 10
-        distances, indices = index.search(unlabeled_embeddings, k)
+        distances, indices = index.search(unlabeled_embeddings_np, k)
         logits = get_logits_from_knn(k, indices, labeled_labels, num_classes)
         predicted_labels = np.array(np.argmax(logits, axis=1))
-        unlabeled_ground_truth = np.array(unlabled_ground_truth)
+        unlabeled_ground_truth = np.array(unlabeled_ground_truth)
 
+        # Evaluate labeling accuracy
         corrects = np.sum(predicted_labels == unlabeled_ground_truth)
         labeling_acc = corrects / len(unlabeled_ground_truth)
         print(f"Labeling Accuracy: {labeling_acc * 100:.2f}%")
 
+        # Create all_labels array with both labeled and pseudo-labeled data
         all_labels = np.zeros(len(train_dataset), dtype=int)
         all_labels[labeled_indices] = labeled_labels.flatten()
         all_labels[unlabeled_indices] = predicted_labels
@@ -398,13 +395,10 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
                                     num_samples=len(train_dataset), num_classes=num_classes, seed=seed)[int(id)]
             
         if embed_input:
-            labeled_embeddings = torch.load(os.path.join(save_path, labeled_embeddings_fname)).numpy().astype('float32')
-            unlabeled_embeddings = torch.load(os.path.join(save_path, unlabeled_embeddings_fname)).numpy().astype('float32')
-            all_train_embeddings = np.concatenate((labeled_embeddings, unlabeled_embeddings), axis=0)
-            
+            train_embeddings = torch.load(os.path.join(save_path, train_embeddings_fname)).numpy().astype('float32')
             # Load all labels
             all_labels = np.array(train_dataset.targets)
-            subset_embeddings = all_train_embeddings[train_indices]
+            subset_embeddings = train_embeddings[train_indices]
             subset_labels = all_labels[train_indices]
             
             # Create EmbeddingDataset and Dataloader for the client's data
