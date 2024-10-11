@@ -115,7 +115,7 @@ def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_pat
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         torch.save(all_embeddings, save_path+fname)
-        torch.save(all_labels, save_path+lname)
+        np.save(save_path+lname, all_labels)
     return all_embeddings, all_labels
 
 def get_logits_from_knn(k, indices, labeled_labels, num_classes):
@@ -150,7 +150,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     save_path = "./embeddings/"
     # Define filenames for embeddings and labels
     train_embeddings_fname = f"{dataset_name}_embeddings_train.pt"
-    train_labels_fname = f"{dataset_name}_train_labels.pt"
+    train_labels_fname = f"{dataset_name}_train_labels.npy"
     
     # Choose dataset based on the provided name
     if dataset_name.lower() == "cifar10":
@@ -232,7 +232,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
 
         if os.path.exists(os.path.join(save_path, train_embeddings_fname)):
             train_embeddings = torch.load(os.path.join(save_path, train_embeddings_fname))
-            train_labels = torch.load(os.path.join(save_path, train_labels_fname))
+            train_labels = np.load(os.path.join(save_path, train_labels_fname))
         else:
             train_embeddings, train_labels = get_embeddings(
                 train_dataset_for_embeddings, model, device, fname=train_embeddings_fname, lname=train_labels_fname, batch_size=batch_size, save_path=save_path
@@ -343,7 +343,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     if embed_input:
         # Filenames for test embeddings and labels
         test_embeddings_fname = f"{dataset_name}_embeddings_test.pt"
-        test_labels_fname = f"{dataset_name}_test_labels.pt"
+        test_labels_fname = f"{dataset_name}_test_labels.npy"
         
         # Check if test embeddings already exist
         if os.path.exists(os.path.join(save_path, test_embeddings_fname)):
@@ -360,14 +360,13 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
                 save_path=save_path
             )
         
-        # Convert embeddings and labels to numpy arrays if they are not already
-        test_embeddings = test_embeddings.numpy().astype('float32')
-        test_labels = test_labels.flatten()
+        # Convert labels to Tensor if they are not already
+        test_labels = torch.from_numpy(test_labels).long()
 
     # Return evaluation dataset if required
     if return_eval_ds:
         if embed_input:
-            test_dataset_embeddings = TensorDataset(torch.from_numpy(test_embeddings), test_labels)
+            test_dataset_embeddings = TensorDataset(test_embeddings, test_labels)
             eval_loader = DataLoader(test_dataset_embeddings, batch_size=batch_size * 4, shuffle=False, num_workers=num_workers)
             num_samples = len(test_dataset_embeddings)
         else:
