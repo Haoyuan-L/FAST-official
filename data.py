@@ -111,6 +111,7 @@ def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_pat
 
     all_embeddings = torch.cat(all_embeddings)
     all_labels = torch.cat(all_labels)
+    all_labels = all_labels.cpu().numpy()
 
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -348,7 +349,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         # Check if test embeddings already exist
         if os.path.exists(os.path.join(save_path, test_embeddings_fname)):
             test_embeddings = torch.load(os.path.join(save_path, test_embeddings_fname))
-            test_labels = torch.load(os.path.join(save_path, test_labels_fname))
+            test_labels = np.load(os.path.join(save_path, test_labels_fname))
         else:
             # Create a subset of the test_dataset to encode all test samples
             test_subset = torch.utils.data.Subset(test_dataset_for_embeddings, list(range(len(test_dataset_for_embeddings))))
