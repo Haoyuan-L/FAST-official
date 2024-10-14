@@ -23,7 +23,8 @@ from client import Client
 from server import Server
 
 def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split='iid', max_parallel_executions=5, active_oracle=True,
-                   timeout=1500, init_model=None, dataset="cifar10", skewness_alpha=None, class_aware=False, uncertainty="norm", model="resnet18"):
+                   timeout=1500, init_model=None, dataset="cifar10", skewness_alpha=None, class_aware=False, uncertainty="norm", 
+                   model="resnet18", encoder="SigLIP"):
     
     embed_input = False
     if model == "resnet18":
@@ -39,13 +40,13 @@ def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split
     def create_client(cid):
         time.sleep(int(cid) * 0.75)
         return Client(cid=int(cid), dataset=dataset, model_loader=network_fn, embed_input=embed_input,
-                      data_loader=lambda: get_data(dataset_name=dataset, id=cid, num_clients=num_clients, embed_input=embed_input, active_oracle=active_oracle,
+                      data_loader=lambda: get_data(dataset_name=dataset, id=cid, num_clients=num_clients, embed_input=embed_input, encoder=encoder, active_oracle=active_oracle,
                                                    split=data_split, alpha=skewness_alpha, class_aware=class_aware, uncertainty=uncertainty))
 
     def create_server(init_model=None):
         return Server(num_rounds=num_rounds, num_clients=num_clients, embed_input=embed_input,
                       participation=participation, model_loader=network_fn, dataset=dataset, 
-                      data_loader=lambda: get_data(dataset_name=dataset, embed_input=embed_input, active_oracle=active_oracle, split=data_split, alpha=skewness_alpha, return_eval_ds=True), 
+                      data_loader=lambda: get_data(dataset_name=dataset, embed_input=embed_input, encoder=encoder, active_oracle=active_oracle, split=data_split, alpha=skewness_alpha, return_eval_ds=True), 
                       init_model=init_model)
     ray.shutdown()
     ray.init()
@@ -107,7 +108,7 @@ def run_with_different_configs(yaml_config_file):
                                  data_split=config["data_split"], participation=config["participation"],
                                  max_parallel_executions=config["max_parallel_executions"], dataset=config["dataset"],
                                  skewness_alpha=config["skewness_alpha"], class_aware=config["class_aware"], uncertainty=config["uncertainty"],
-                                 active_oracle=config["active_oracle"])
+                                 active_oracle=config["active_oracle"], encoder=config["encoder"])
 
         # Log the results of the experiment
         fname = config["model"] + "_" + config["dataset"]+ "_" + config["data_split"] + "_" + config["uncertainty"] + "_" + "class_aware-" + str(config["class_aware"]) + ".log"

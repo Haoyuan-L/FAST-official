@@ -105,7 +105,11 @@ def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_pat
     with torch.no_grad():
         for images, labels in dataloader:
             images = images.to(device)
-            embeddings = model.encode_image(images).float()
+            # Check if the model has 'encode_image' method
+            if hasattr(model, 'encode_image'):
+                embeddings = model.encode_image(images).float()
+            else:
+                embeddings = model(images).float()
             all_embeddings.append(embeddings.cpu())
             all_labels.append(labels)
 
@@ -137,12 +141,26 @@ def get_logits_from_knn(k, indices, labeled_labels, num_classes):
         logits.append(logit)
     return np.array(logits)
 
-def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, embed_input=False,
+def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, embed_input=False, encoder="SigLIP",
              split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm", active_oracle=True):
 
     # load the OpenCLIP model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16-SigLIP-512', 'webli')
+    if encoder == "SigLIP":
+        model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16-SigLIP-512', 'webli')
+    elif encoder == "CLIP":
+        model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16', 'claion2b_s34b_b88klip')
+    elif encoder == "EvaCLIP":
+        model, _, preprocess = open_clip.create_model_and_transforms('EVA02-B-16', 'merged2b_s8b_b131k')
+    elif encoder == "DINOv2":
+        model = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitb14')
+        # Define the preprocessing transforms
+        preprocess = transforms.Compose([
+            transforms.Resize(256, interpolation=transforms.InterpolationMode.BICUBIC),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ])
     model.to(device)
     model.eval()
     if not os.path.exists(data_dir):
