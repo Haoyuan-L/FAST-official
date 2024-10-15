@@ -111,7 +111,7 @@ def run_with_different_configs(yaml_config_file):
                                  active_oracle=config["active_oracle"], encoder=config["encoder"], budget=config["budget"])
 
         # Log the results of the experiment
-        fname = f"{config["model"]}_{config["dataset"]}_{config["data_split"]}_{config["uncertainty"]}_class_aware-{str(config["class_aware"])}_Oracle-{config["active_oracle"]}_{config["encoder"]}_budget-{config["budget"]}.log"
+        fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_{config["uncertainty"]}_class_aware-{str(config["class_aware"])}_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}.log'
         log_results(history, config, fname)
 
 
