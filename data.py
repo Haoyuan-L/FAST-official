@@ -142,7 +142,7 @@ def get_logits_from_knn(k, indices, labeled_labels, num_classes):
     return np.array(logits)
 
 def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, embed_input=False, encoder="SigLIP",
-             split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm", active_oracle=True):
+             split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm", active_oracle=True, budget=0.1):
 
     # load the OpenCLIP model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -303,7 +303,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
                 raise ValueError(f"Unknown uncertainty method: {uncertainty}")
 
             # select the most uncertain samples for manual labeling (Oracle)
-            query_ratio = 0.05
+            query_ratio = budget
             uncertainty_score = uncertainty_func(logits)
             num_query_samples = int(query_ratio * len(unlabeled_indices))
             class_aware = True  # Set this to False for class-agnostic sampling
