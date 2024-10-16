@@ -28,17 +28,21 @@ def get_transforms(dataset_name, augmentation=True):
                             transforms.RandomHorizontalFlip(), 
                             transforms.ToTensor(), 
                             transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
-        else:
+        elif dataset_name.lower() in ["cifar10", "cifar100", "svhn"]:
             data_transform = [transforms.RandomCrop(32, padding=4),
+                            transforms.RandomHorizontalFlip(), 
+                            transforms.ToTensor(), 
+                            transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
+        else:
+            data_transform = [transforms.RandomCrop(28, padding=4),
                             transforms.RandomHorizontalFlip(), 
                             transforms.ToTensor(), 
                             transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
     else:
         data_transform = [transforms.ToTensor(), 
-						  transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
+                          transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
 
     return transforms.Compose(data_transform)
-
 
 def extract_labels(dataset):
     if hasattr(dataset, 'targets'):

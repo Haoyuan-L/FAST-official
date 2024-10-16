@@ -23,20 +23,20 @@ class CNN4Conv(nn.Module):
             conv3x3(hidden_size, hidden_size)
         )
 
-        # if img_size == 64:
-        #     self.emb_dim = hidden_size * 4 * 4
-        # elif img_size == 32:
-        #     self.emb_dim = hidden_size * 2 * 2
-        # elif img_size == 28:
-        #     self.emb_dim = hidden_size * 1 * 1 
-        # else:
-        #     raise NotImplementedError(f"Unsupported image size: {img_size}")
+        if img_size == 64:
+            self.emb_dim = hidden_size * 4 * 4
+        elif img_size == 32:
+            self.emb_dim = hidden_size * 2 * 2
+        elif img_size == 28:
+            self.emb_dim = hidden_size * 1 * 1
+        else:
+            raise NotImplementedError(f"Unsupported image size: {img_size}")
 
         # Compute emb_dim
-        with torch.no_grad():
-            dummy_input = torch.zeros(1, in_channels, img_size, img_size)
-            output_feat = self.features(dummy_input)
-            self.emb_dim = output_feat.view(-1).shape[0]
+#        with torch.no_grad():
+#            dummy_input = torch.zeros(1, in_channels, img_size, img_size)
+#            output_feat = self.features(dummy_input)
+#            self.emb_dim = output_feat.view(1, -1).size(1)
 
         self.linear = nn.Linear(self.emb_dim, num_classes)
         self.linear.bias.data.fill_(0)
