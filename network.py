@@ -17,14 +17,20 @@ class CNN4Conv(nn.Module):
         num_classes = num_classes
         hidden_size = 64
         
-        if img_size == 64:
-            self.emb_dim = hidden_size * 4 * 4
-        elif img_size == 32:
-            self.emb_dim = hidden_size * 2 * 2
-        elif img_size == 28:
-            self.emb_dim = hidden_size * 1 * 1
-        else:
-            raise NotImplementedError(f"Unsupported image size: {img_size}")
+        # if img_size == 64:
+        #     self.emb_dim = hidden_size * 4 * 4
+        # elif img_size == 32:
+        #     self.emb_dim = hidden_size * 2 * 2
+        # elif img_size == 28:
+        #     self.emb_dim = hidden_size * 1 * 1 
+        # else:
+        #     raise NotImplementedError(f"Unsupported image size: {img_size}")
+
+        # Compute emb_dim
+        with torch.no_grad():
+            dummy_input = torch.zeros(1, in_channels, img_size, img_size)
+            output_feat = self.features(dummy_input)
+            self.emb_dim = output_feat.view(-1).shape[0]
             
         self.features = nn.Sequential(
             conv3x3(in_channels, hidden_size),
