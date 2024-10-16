@@ -22,7 +22,7 @@ class CNN4Conv(nn.Module):
         elif img_size == 32:
             self.emb_dim = hidden_size * 2 * 2
         elif img_size == 28:
-            self.emb_dim = hidden_size * 2 * 2 
+            self.emb_dim = hidden_size * 1 * 1
         else:
             raise NotImplementedError(f"Unsupported image size: {img_size}")
             
