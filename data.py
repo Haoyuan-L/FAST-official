@@ -274,6 +274,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         logits = get_logits_from_knn(k, indices, labeled_labels, num_classes)
         predicted_labels = np.array(np.argmax(logits, axis=1))
         unlabeled_ground_truth = np.array(unlabeled_ground_truth)
+        unlabeled_ground_truth = unlabeled_ground_truth.squeeze()
 
         # Evaluate labeling accuracy
         corrects = np.sum(predicted_labels == unlabeled_ground_truth)
