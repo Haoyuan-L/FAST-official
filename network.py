@@ -16,7 +16,13 @@ class CNN4Conv(nn.Module):
         in_channels = in_channels
         num_classes = num_classes
         hidden_size = 64
-        
+        self.features = nn.Sequential(
+            conv3x3(in_channels, hidden_size),
+            conv3x3(hidden_size, hidden_size),
+            conv3x3(hidden_size, hidden_size),
+            conv3x3(hidden_size, hidden_size)
+        )
+
         # if img_size == 64:
         #     self.emb_dim = hidden_size * 4 * 4
         # elif img_size == 32:
@@ -31,13 +37,6 @@ class CNN4Conv(nn.Module):
             dummy_input = torch.zeros(1, in_channels, img_size, img_size)
             output_feat = self.features(dummy_input)
             self.emb_dim = output_feat.view(-1).shape[0]
-            
-        self.features = nn.Sequential(
-            conv3x3(in_channels, hidden_size),
-            conv3x3(hidden_size, hidden_size),
-            conv3x3(hidden_size, hidden_size),
-            conv3x3(hidden_size, hidden_size)
-        )
 
         self.linear = nn.Linear(self.emb_dim, num_classes)
         self.linear.bias.data.fill_(0)
