@@ -339,7 +339,6 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             query_ratio = budget
             uncertainty_score = uncertainty_func(logits)
             num_query_samples = int(query_ratio * len(unlabeled_indices))
-            class_aware = True  # Set this to False for class-agnostic sampling
 
             if class_aware:
                 predicted_labels = np.argmax(logits, axis=1)
