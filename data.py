@@ -127,7 +127,7 @@ def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_pat
         np.save(save_path+lname, all_labels)
     return all_embeddings, all_labels
 
-def get_logits_from_knn(k, indices, labeled_labels, num_classes):
+def get_labels_from_knn(k, indices, labeled_labels, num_classes):
     logits = []
     for neighbor_indices in indices:
         neighbor_labels = labeled_labels[neighbor_indices]
@@ -144,6 +144,32 @@ def get_logits_from_knn(k, indices, labeled_labels, num_classes):
             logit[label] = count / k # Fraction of neighbors that belong to the class
         logits.append(logit)
     return np.array(logits)
+
+def get_min_distance_logits(unlabeled_embeddings, labeled_embeddings, labeled_labels, num_classes):
+    """
+    Calculate logits based on the minimum distance from each unlabeled sample to each class.
+    """
+    min_distances = np.full((unlabeled_embeddings.shape[0], num_classes), np.inf, dtype=np.float32)
+    
+    for cls in range(num_classes):
+        # Get embeddings of the current class
+        cls_indices = np.where(labeled_labels == cls)[0]
+        cls_embeddings = labeled_embeddings[cls_indices]
+        
+        if cls_embeddings.shape[0] == 0:
+            raise ValueError(f"No samples found for class {cls}")
+        
+        # Build FAISS index for the current class
+        index = faiss.IndexFlatL2(labeled_embeddings.shape[1])
+        index.add(cls_embeddings.astype('float32'))
+        
+        # Perform 1-NN search to find the nearest sample in this class
+        distances, _ = index.search(unlabeled_embeddings.astype('float32'), 1)
+        
+        # Take the square root of squared L2 distances to get actual Euclidean distances
+        min_distances[:, cls] = np.sqrt(distances).flatten()
+    
+    return min_distances
 
 def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, embed_input=False, encoder="SigLIP",
              split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm", active_oracle=True, budget=0.1):
@@ -270,13 +296,12 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         # Apply FAISS-KNN to embeddings for data labeling
         labeled_embeddings_np = labeled_embeddings.numpy().astype('float32')
         unlabeled_embeddings_np = unlabeled_embeddings.numpy().astype('float32')
-
         index = faiss.IndexFlatL2(labeled_embeddings_np.shape[1])
         index.add(labeled_embeddings_np)
         k = 10
         distances, indices = index.search(unlabeled_embeddings_np, k)
-        logits = get_logits_from_knn(k, indices, labeled_labels, num_classes)
-        predicted_labels = np.array(np.argmax(logits, axis=1))
+        label_frac = get_labels_from_knn(k, indices, labeled_labels, num_classes)
+        predicted_labels = np.array(np.argmax(label_frac, axis=1))
         unlabeled_ground_truth = np.array(unlabeled_ground_truth)
         unlabeled_ground_truth = unlabeled_ground_truth.squeeze()
 
@@ -284,6 +309,9 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         corrects = np.sum(predicted_labels == unlabeled_ground_truth)
         labeling_acc = corrects / len(unlabeled_ground_truth)
         print(f"Labeling Accuracy: {labeling_acc * 100:.2f}%")
+
+        # Calculate logits based on the minimum distance from each unlabeled sample to each class
+        logits = get_min_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
 
         # Create all_labels array with both labeled and pseudo-labeled data
         all_labels = np.zeros(len(train_dataset), dtype=int)
