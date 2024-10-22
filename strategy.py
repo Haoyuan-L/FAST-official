@@ -12,92 +12,43 @@ from flwr.common import (
 )
 import numpy as np
 
-class CustomFedAvg(fl.server.strategy.FedAvg):
-    def __init__(
-        self,
-        model_loader: Callable,
-        data_loader: Callable,
-        num_classes: int,
-        device: str = 'cuda',
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.best_accuracy = 0.0  # Initialize best accuracy
-        self.best_parameters = None  # Store the best parameters
-        self.device = device
-        self.model_loader = model_loader
-        self.data_loader = data_loader
-        self.num_classes = num_classes
-        self.loss_fn = torch.nn.CrossEntropyLoss()
-
-        # Load evaluation data
-        self.eval_data, _, _ = self.data_loader()
-
-        # Initialize the model
-        self.model = self.model_loader(num_classes=self.num_classes).to(self.device)
+class CustomFedNova(fl.server.strategy.FedAvg):
 
     def aggregate_fit(
         self,
         server_round: int,
-        results: List[Tuple[fl.server.client_proxy.ClientProxy, FitRes]],
-        failures: List[BaseException],
-    ) -> Tuple[Optional[Parameters], Dict[str, Scalar]]:
-        # Aggregate the client updates
-        aggregated_parameters, metrics_aggregated = super().aggregate_fit(server_round, results, failures)
+        results: List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.FitRes]],
+        failures: List[Union[Tuple[fl.server.client_proxy.ClientProxy, fl.common.FitRes], BaseException]],
+    ) -> Tuple[Optional[fl.common.Parameters], fl.common.Scalar]:
 
-        if aggregated_parameters is not None:
-            # Set the model parameters to the aggregated parameters
-            self.set_model_params(aggregated_parameters)
+        if not results:
+            return None, {}
 
-            # Evaluate the new global model
-            loss, accuracy = self.evaluate_model()
-            print(f"Round {server_round} - Loss: {loss:.4f}, Accuracy: {accuracy * 100:.2f}%")
+        # Compute tau_effective from summation of local client tau: Eqn-6: Section 4.1
+        local_tau = [res.metrics["tau"] for _, res in results]
+        tau_eff = np.sum(local_tau)
 
-            # Check if the new accuracy is better than the best so far
-            if accuracy > self.best_accuracy:
-                print(f"New best model found at round {server_round} with accuracy {accuracy * 100:.2f}%")
-                self.best_accuracy = accuracy
-                self.best_parameters = aggregated_parameters
-            else:
-                print(f"Accuracy did not improve at round {server_round}. Keeping the previous best model.")
-                # Revert to the best parameters
-                aggregated_parameters = self.best_parameters
-                # Also set the model parameters to the best parameters
-                if self.best_parameters is not None:
-                    self.set_model_params(self.best_parameters)
+        aggregate_parameters = []
 
-        return aggregated_parameters, metrics_aggregated
+        for _client, res in results:
+            params = parameters_to_ndarrays(res.parameters)
+            # compute the scale by which to weight each client's gradient
+            # res.metrics["local_norm"] contains total number of local update steps
+            # for each client
+            # res.metrics["ratio"] contains the ratio of client dataset size
+            # Below corresponds to Eqn-6: Section 4.1
+            scale = tau_eff / float(res.metrics["local_norm"])
+            scale *= float(res.metrics["ratio"])
 
-    def set_model_params(self, parameters: Parameters):
-        # Convert parameters to model's state_dict format and load them
-        params_dict = zip(
-            self.model.state_dict().keys(),
-            parameters_to_tensors(parameters),
-        )
-        state_dict = collections.OrderedDict({k: v.to(self.device) for k, v in params_dict})
-        self.model.load_state_dict(state_dict, strict=True)
+            aggregate_parameters.append((params, scale))
 
-    def evaluate_model(self) -> Tuple[float, float]:
-        # Evaluate the model on the server's evaluation data
-        self.model.eval()
-        loss_total = 0.0
-        correct = 0
-        total = 0
+        # Aggregate all client parameters with a weighted average using the scale
+        agg_cum_gradient = aggregate(aggregate_parameters)
 
-        with torch.no_grad():
-            for x, y in self.eval_data:
-                x, y = x.to(self.device), y.to(self.device).long()
-                outputs = self.model(x)
-                loss = self.loss_fn(outputs, y)
-                loss_total += loss.item() * x.size(0)
-                _, predicted = torch.max(outputs.data, 1)
-                total += y.size(0)
-                correct += (predicted == y).sum().item()
+        # Aggregate custom metrics if aggregation function was provided
+        metrics_aggregated = {}
+        if self.fit_metrics_aggregation_fn:
+            fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
+            metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
 
-        average_loss = loss_total / total
-        accuracy = correct / total
-
-        return average_loss, accuracy
-
-def parameters_to_tensors(parameters: Parameters):
-    return [torch.tensor(np_param, dtype=torch.float32) for np_param in parameters_to_ndarrays(parameters)]
+        return ndarrays_to_parameters(agg_cum_gradient), metrics_aggregated
