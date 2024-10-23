@@ -415,6 +415,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
                 batch_size=batch_size, 
                 save_path=save_path
             )
+        test_labels = torch.from_numpy(test_labels).long()
 
     # Return evaluation dataset if required
     if return_eval_ds:
