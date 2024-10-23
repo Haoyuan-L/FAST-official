@@ -399,7 +399,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     if embed_input:
         # Filenames for test embeddings and labels
         test_embeddings_fname = f"{dataset_name}_embeddings_test.pt"
-        test_labels_fname = f"{dataset_name}_test_labels.npy"
+        test_labels_fname = f"{dataset_name}_test_labels.pt"
         
         # Check if test embeddings already exist
         if os.path.exists(os.path.join(save_path, test_embeddings_fname)):
