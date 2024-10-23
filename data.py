@@ -11,6 +11,7 @@ import open_clip
 import faiss
 from collections import Counter
 import time
+from scipy.stats import mode
 
 def get_transforms(dataset_name, augmentation=True):
     """Returns the appropriate transformations based on the dataset name."""
@@ -124,7 +125,7 @@ def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_pat
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         torch.save(all_embeddings, save_path+fname)
-        np.save(save_path+lname, all_labels)
+        torch.save(all_labels, save_path+lname)
     return all_embeddings, all_labels
 
 def get_labels_from_knn(k, indices, labeled_labels, num_classes):
@@ -252,8 +253,8 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     else:
         raise ValueError(f"Dataset {dataset_name} is not supported.")
  
-    if os.path.exists(f"{dataset_name}_{uncertainty}_labels.npy"):
-        all_labels = np.load(f"{dataset_name}_{uncertainty}_labels.npy")
+    if os.path.exists(f"{dataset_name}_{uncertainty}_balance-{class_aware}_labels.npy"):
+        all_labels = np.load(f"{dataset_name}_{uncertainty}_balance-{class_aware}_labels.npy")
     else:
         # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
         initial_labeled_ratio = 0.01
@@ -300,12 +301,18 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         index.add(labeled_embeddings_np)
         k = 10
         distances, indices = index.search(unlabeled_embeddings_np, k)
-        label_frac = get_labels_from_knn(k, indices, labeled_labels, num_classes)
-        predicted_labels = np.array(np.argmax(label_frac, axis=1))
-        unlabeled_ground_truth = np.array(unlabeled_ground_truth)
-        unlabeled_ground_truth = unlabeled_ground_truth.squeeze()
+
+        # Get the pseudo-labels for the unlabeled data via majority voting
+        # label_frac = get_labels_from_knn(k, indices, labeled_labels, num_classes)
+        # predicted_labels = np.array(np.argmax(label_frac, axis=1))
+        labeled_labels_np = labeled_labels.numpy()
+        neighbor_labels = labeled_labels_np[indices]
+        predicted_labels, _ = mode(neighbor_labels, axis=1)
+        predicted_labels = predicted_labels.flatten()
 
         # Evaluate labeling accuracy
+        unlabeled_ground_truth = unlabeled_ground_truth.numpy()
+        unlabeled_ground_truth = unlabeled_ground_truth.squeeze()
         corrects = np.sum(predicted_labels == unlabeled_ground_truth)
         labeling_acc = corrects / len(unlabeled_ground_truth)
         print(f"Labeling Accuracy: {labeling_acc * 100:.2f}%")
@@ -380,7 +387,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
                 oracle_annotation_labels = unlabeled_ground_truth[uncertain_indices]
                 all_labels[uncertain_sample_indices] = oracle_annotation_labels
 
-            np.save(f"{dataset_name}_{uncertainty}_labels.npy", all_labels)
+            np.save(f"{dataset_name}_{uncertainty}_balance-{class_aware}_labels.npy", all_labels)
 
             # labeling accuracy after first AL round
             updated_unlabeled_labels = all_labels[unlabeled_indices]
