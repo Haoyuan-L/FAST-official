@@ -119,7 +119,7 @@ class Client(fl.client.NumPyClient):
 			for _, (x, y) in enumerate(ds):
 				x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True).long().squeeze()
 				optimizer.zero_grad()
-				preds, feature_outputs = model(x)
+				preds = model(x)
 				_loss = loss(preds, y)
 				_loss.backward()
 				optimizer.step()
@@ -151,7 +151,7 @@ class Client(fl.client.NumPyClient):
 			for _, (x, y) in enumerate(ds):
 				x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True).long().squeeze()
 				optimizer.zero_grad()
-				preds, feature_outputs = model(x)
+				preds = model(x)
 				_loss = loss(preds, y)
 
 				# Proximal term calculation
