@@ -6,8 +6,8 @@ import torch.optim as optim
 
 class Client(fl.client.NumPyClient):
 
-	def __init__(self, cid, dataset, model_loader, data_loader, embed_input=False, device='cuda', fl="fedavg"):
-		self.fl = fl
+	def __init__(self, cid, dataset, model_loader, data_loader, embed_input=False, device='cuda', fl_method="fedavg"):
+		self.fl_method = fl_method
 		self.cid = cid
 		self.data, self.num_classes, self.num_samples = data_loader()
 		self.embed_input = embed_input
@@ -46,17 +46,17 @@ class Client(fl.client.NumPyClient):
 		optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
 		# Adam optimizer
 		#optimizer = torch.optim.Adam(self.model.parameters(), lr=config['lr'])
-		if self.fl.lower() == "fedavg":
+		if self.fl_method.lower() == "fedavg":
 			h = __class__.train(ds=self.data, model=self.model, epochs=config['epochs'], optimizer=optimizer, num_classes=self.num_classes)
 			return self.get_parameters(), self.num_samples, h
 
-		elif self.fl.lower() == "fedprox":
+		elif self.fl_method.lower() == "fedprox":
 			global_params = [p.clone().detach() for p in self.model.parameters()]
 			proximal_mu=config["proximal_mu"]
 			h = __class__.fedprox_train(ds=self.data, model=self.model, epochs=config['epochs'], optimizer=optimizer, num_classes=self.num_classes, global_params=global_params, proximal_mu=proximal_mu)
 			return self.get_parameters(), self.num_samples, h
 
-		elif self.fl.lower() == "fednova":
+		elif self.fl_method.lower() == "fednova":
 			h = __class__.fednova_train(ds=self.data, model=self.model, epochs=config['epochs'], optimizer=optimizer, num_classes=self.num_classes)
 			local_tau = h['local_normalizing_vec'] * self.ratio
 			return self.get_parameters({}), self.num_samples, {'loss': h['loss'], 'accuracy': h['accuracy'], "ratio": self.ratio, "tau": local_tau, "local_norm": h['local_normalizing_vec']}
