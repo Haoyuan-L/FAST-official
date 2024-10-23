@@ -443,7 +443,8 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             # Split data into client-specific subsets
             train_indices = split_fn(idxs=train_dataset.targets, num_shards=num_clients,
                                     num_samples=len(train_dataset), num_classes=num_classes, seed=seed)[int(id)]
-            
+        data_ratio = len(train_indices) / len(train_dataset)
+
         if embed_input:
             train_embeddings = torch.load(os.path.join(save_path, train_embeddings_fname)).float()
             # Load all labels
@@ -461,4 +462,4 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
             num_samples = len(train_indices)
 
-        return train_loader, num_classes, num_samples
+        return train_loader, num_classes, num_samples, data_ratio

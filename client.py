@@ -9,7 +9,7 @@ class Client(fl.client.NumPyClient):
 	def __init__(self, cid, dataset, model_loader, data_loader, embed_input=False, device='cuda', fl_method="fedavg"):
 		self.fl_method = fl_method
 		self.cid = cid
-		self.data, self.num_classes, self.num_samples = data_loader()
+		self.data, self.num_classes, self.num_samples, self.ratio = data_loader()
 		self.embed_input = embed_input
 		# Determine input shape based on embed_input flag
 		if self.embed_input:
