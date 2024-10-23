@@ -10,8 +10,9 @@ class Server(fl.server.Server):
 
 	def __init__(self, dataset, model_loader, data_loader, num_rounds, num_clients=10, embed_input=False,
 		participation=1.0, init_model=None, log_level=logging.INFO,
-		initial_lr=1e-3, decay_factor=0.1, num_decays=3):
+		initial_lr=1e-3, decay_factor=0.1, num_decays=3, fl="fedavg"):
 		
+		self.fl = fl
 		self.num_rounds = num_rounds
 		self.data_loader = data_loader
 		self.data, self.num_classes, self.num_samples = data_loader()
@@ -48,11 +49,25 @@ class Server(fl.server.Server):
 		return super(Server, self).set_max_workers(*args, **kwargs)
 
 	def set_strategy(self, *_):
-		self.strategy = fl.server.strategy.FedAvg(
+		if self.fl.lower() == "fedavg":
+			self.strategy = fl.server.strategy.FedAvg(
+				min_available_clients=self.num_clients, fraction_fit=self.participation,
+				min_fit_clients=int(self.participation*self.num_clients), fraction_evaluate=0.0,
+				min_evaluate_clients=0, evaluate_fn=self.get_evaluation_fn(),
+				on_fit_config_fn=self.get_client_config_fn(), initial_parameters=self.get_initial_parameters(),)
+		elif self.fl.lower() == "fedprox":
+			self.strategy = fl.server.strategy.FedProx(
 			min_available_clients=self.num_clients, fraction_fit=self.participation,
 			min_fit_clients=int(self.participation*self.num_clients), fraction_evaluate=0.0,
 			min_evaluate_clients=0, evaluate_fn=self.get_evaluation_fn(),
-			on_fit_config_fn=self.get_client_config_fn(), initial_parameters=self.get_initial_parameters(),)
+			on_fit_config_fn=self.get_client_config_fn(), initial_parameters=self.get_initial_parameters(),
+			proximal_mu=0.1,)
+		elif self.fl.lower() == "fednova":
+			self.strategy = CustomFedNova(
+				min_available_clients=self.num_clients, fraction_fit=self.participation,
+				min_fit_clients=int(self.participation*self.num_clients), fraction_evaluate=0.0,
+				min_evaluate_clients=0, evaluate_fn=self.get_evaluation_fn(),
+				on_fit_config_fn=self.get_client_config_fn(), initial_parameters=self.get_initial_parameters(),)
 
 	def client_manager(self, *args, **kwargs):
 		return super(Server, self).client_manager(*args, **kwargs)
