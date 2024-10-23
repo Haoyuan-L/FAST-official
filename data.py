@@ -404,7 +404,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         # Check if test embeddings already exist
         if os.path.exists(os.path.join(save_path, test_embeddings_fname)):
             test_embeddings = torch.load(os.path.join(save_path, test_embeddings_fname))
-            test_labels = np.load(os.path.join(save_path, test_labels_fname))
+            test_labels = torch.load(os.path.join(save_path, test_labels_fname))
         else:
             # Create a subset of the test_dataset to encode all test samples
             test_subset = torch.utils.data.Subset(test_dataset_for_embeddings, list(range(len(test_dataset_for_embeddings))))
@@ -415,9 +415,6 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
                 batch_size=batch_size, 
                 save_path=save_path
             )
-        
-        # Convert labels to Tensor if they are not already
-        test_labels = torch.from_numpy(test_labels).long()
 
     # Return evaluation dataset if required
     if return_eval_ds:
