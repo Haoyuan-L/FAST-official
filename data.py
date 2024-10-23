@@ -200,7 +200,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     save_path = "./embeddings/"
     # Define filenames for embeddings and labels
     train_embeddings_fname = f"{dataset_name}_embeddings_train.pt"
-    train_labels_fname = f"{dataset_name}_train_labels.npy"
+    train_labels_fname = f"{dataset_name}_train_labels.pt"
     
     # Choose dataset based on the provided name
     if dataset_name.lower() == "cifar10":
@@ -282,7 +282,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
 
         if os.path.exists(os.path.join(save_path, train_embeddings_fname)):
             train_embeddings = torch.load(os.path.join(save_path, train_embeddings_fname))
-            train_labels = np.load(os.path.join(save_path, train_labels_fname))
+            train_labels = torch.load(os.path.join(save_path, train_labels_fname))
         else:
             train_embeddings, train_labels = get_embeddings(
                 train_dataset_for_embeddings, model, device, fname=train_embeddings_fname, lname=train_labels_fname, batch_size=batch_size, save_path=save_path
@@ -305,8 +305,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         # Get the pseudo-labels for the unlabeled data via majority voting
         # label_frac = get_labels_from_knn(k, indices, labeled_labels, num_classes)
         # predicted_labels = np.array(np.argmax(label_frac, axis=1))
-        labeled_labels_np = labeled_labels.numpy()
-        neighbor_labels = labeled_labels_np[indices]
+        neighbor_labels = labeled_labels[indices]
         predicted_labels, _ = mode(neighbor_labels, axis=1)
         predicted_labels = predicted_labels.flatten()
 
