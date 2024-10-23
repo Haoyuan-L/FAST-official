@@ -310,7 +310,6 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         predicted_labels = predicted_labels.flatten()
 
         # Evaluate labeling accuracy
-        unlabeled_ground_truth = unlabeled_ground_truth.numpy()
         unlabeled_ground_truth = unlabeled_ground_truth.squeeze()
         corrects = np.sum(predicted_labels == unlabeled_ground_truth)
         labeling_acc = corrects / len(unlabeled_ground_truth)
