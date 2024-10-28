@@ -24,7 +24,7 @@ from server import Server
 
 def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split='iid', max_parallel_executions=5, active_oracle=True,
                    timeout=1500, init_model=None, dataset="cifar10", skewness_alpha=None, class_aware=False, uncertainty="norm", 
-                   model="resnet18", encoder="SigLIP", budget=0.1, fl_method="fedavg"):
+                   model="resnet18", encoder="SigLIP", budget=0.1, fl_method="fedavg", initial_only=False, initial_with_random=False):
     
     embed_input = False
     if model == "resnet18":
@@ -41,13 +41,14 @@ def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split
         time.sleep(int(cid) * 0.75)
         return Client(cid=int(cid), dataset=dataset, model_loader=network_fn, embed_input=embed_input, fl_method=fl_method,
                       data_loader=lambda: get_data(dataset_name=dataset, id=cid, num_clients=num_clients, embed_input=embed_input, encoder=encoder, active_oracle=active_oracle,
-                                                   split=data_split, alpha=skewness_alpha, class_aware=class_aware, uncertainty=uncertainty, budget=budget))
+                                                   split=data_split, alpha=skewness_alpha, class_aware=class_aware, uncertainty=uncertainty, budget=budget,
+                                                   initial_only=initial_only, initial_with_random=initial_with_random))
 
     def create_server(init_model=None):
         return Server(num_rounds=num_rounds, num_clients=num_clients, embed_input=embed_input, fl_method=fl_method,
                       participation=participation, model_loader=network_fn, dataset=dataset, 
                       data_loader=lambda: get_data(dataset_name=dataset, embed_input=embed_input, encoder=encoder, active_oracle=active_oracle, split=data_split, 
-                                                   alpha=skewness_alpha, return_eval_ds=True, budget=budget), init_model=init_model)
+                                                   alpha=skewness_alpha, return_eval_ds=True, budget=budget, initial_only=initial_only, initial_with_random=initial_with_random), init_model=init_model)
     ray.shutdown()
     ray.init()
     total_resources = ray.cluster_resources()
@@ -108,7 +109,8 @@ def run_with_different_configs(yaml_config_file):
                                  data_split=config["data_split"], participation=config["participation"],
                                  max_parallel_executions=config["max_parallel_executions"], dataset=config["dataset"],
                                  skewness_alpha=config["skewness_alpha"], class_aware=config["class_aware"], uncertainty=config["uncertainty"],
-                                 active_oracle=config["active_oracle"], encoder=config["encoder"], budget=config["budget"], fl_method=config["fl_method"])
+                                 active_oracle=config["active_oracle"], encoder=config["encoder"], budget=config["budget"], fl_method=config["fl_method"],
+                                 initial_only=config["initial_only"], initial_with_random=config["initial_with_random"])
 
         # Log the results of the experiment
         fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_{config["uncertainty"]}_class_aware-{str(config["class_aware"])}_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}.log'

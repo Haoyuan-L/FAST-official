@@ -173,7 +173,8 @@ def get_min_distance_logits(unlabeled_embeddings, labeled_embeddings, labeled_la
     return min_distances
 
 def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, embed_input=False, encoder="SigLIP",
-             split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm", active_oracle=True, budget=0.1):
+             split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm", active_oracle=True, 
+             budget=0.1, initial_only=False, initial_with_random=False):
 
     # load the OpenCLIP model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -252,7 +253,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         num_classes = 200
     else:
         raise ValueError(f"Dataset {dataset_name} is not supported.")
- 
+
     if os.path.exists(f"{dataset_name}_{uncertainty}_balance-{class_aware}_labels.npy"):
         all_labels = np.load(f"{dataset_name}_{uncertainty}_balance-{class_aware}_labels.npy")
     else:
@@ -277,6 +278,22 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         all_indices = set(range(total_samples))
         unlabeled_indices = list(all_indices - set(labeled_indices))
 
+        # initial_only training data
+        initial_data = [train_dataset[i][0] for i in labeled_indices]
+        initial_labels = [labels[i] for i in labeled_indices]
+        torch.save(initial_data, f"{dataset_name}_initial_data.pt")
+        torch.save(initial_labels, f"{dataset_name}_initial_labels.pt")
+    
+        initial_with_random = int(total_samples * budget)
+        add_indices = np.random.choice(unlabeled_indices, initial_with_random, replace=False)
+        # Extract additional data and labels
+        additional_data = [train_dataset[i][0] for i in add_indices]
+        additional_labels = [labels[i] for i in add_indices]
+        updated_data = initial_data + additional_data
+        updated_labels = initial_labels + additional_labels
+        torch.save(updated_data, f"{dataset_name}_intial_with_random_data.pt")
+        torch.save(updated_labels, f"{dataset_name}_intial_with_random_labels.pt")
+
         # Utilize SIGLIP encoder to encode all the training data
         # Load the embeddings if they exist
 
@@ -287,7 +304,16 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             train_embeddings, train_labels = get_embeddings(
                 train_dataset_for_embeddings, model, device, fname=train_embeddings_fname, lname=train_labels_fname, batch_size=batch_size, save_path=save_path
             )
-        
+
+        # Extract and save embeddings for initial data
+        if not os.exists(f"{dataset_name}_initial_embeddings.pt"):
+            initial_embeddings = train_embeddings[labeled_indices]
+            torch.save(initial_embeddings, f"{dataset_name}_initial_embeddings.pt")
+            # Extract and save embeddings for initial with random additional data
+            initial_with_random_indices = labeled_indices + list(add_indices)
+            initial_with_random_embeddings = train_embeddings[initial_with_random_indices]
+            torch.save(initial_with_random_embeddings, f"{dataset_name}_initial_with_random_embeddings.pt")
+                    
         # Use indices to extract labeled and unlabeled embeddings and labels
         labeled_embeddings = train_embeddings[labeled_indices]
         labeled_labels = train_labels[labeled_indices]
@@ -463,6 +489,15 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             )
         test_labels = torch.from_numpy(test_labels).long()
 
+    if initial_only:
+        initial_data = torch.load(f"{dataset_name}_initial_data.pt")
+        train_labels = torch.load(f"{dataset_name}_initial_labels.pt")
+        train_dataset = TensorDataset(initial_data, train_labels)
+    elif initial_with_random:
+        initial_with_random_data = torch.load(f"{dataset_name}_initial_with_random_data.pt")
+        train_labels = torch.load(f"{dataset_name}_initial_with_random_labels.pt")
+        train_dataset = TensorDataset(initial_with_random_data, train_labels)
+
     # Return evaluation dataset if required
     if return_eval_ds:
         if embed_input:
@@ -495,8 +530,14 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         data_ratio = len(train_indices) / len(train_dataset)
 
         if embed_input:
-            train_embeddings = torch.load(os.path.join(save_path, train_embeddings_fname)).float()
-            # Load all labels
+            if initial_only:
+                # Load initial data
+                train_embeddings = torch.load(f"{dataset_name}_initial_embeddings.pt")
+            elif initial_with_random:
+                train_embeddings = torch.load(f"{dataset_name}_initial_with_random_embeddings.pt")
+            else:
+                train_embeddings = torch.load(os.path.join(save_path, train_embeddings_fname)).float()
+    
             all_labels = torch.tensor(train_dataset.targets, dtype=torch.long)
             subset_embeddings = train_embeddings[train_indices]
             subset_labels = all_labels[train_indices]
