@@ -469,7 +469,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             new_labeling_acc = corrects / len(unlabeled_ground_truth)
             print(f"Labeling Accuracy after first AL round: {new_labeling_acc * 100:.2f}%")
     
-    train_dataset.targets = all_labels.tolist()
+        train_dataset.targets = all_labels.tolist()
 
     # Handle embedding of test dataset if embed_input is True
     if embed_input:
