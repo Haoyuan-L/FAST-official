@@ -303,3 +303,19 @@ def make_dataset(root, split, class_to_idx):
         raise ValueError(f"Invalid split: {split}. Expected 'train' or 'val'.")
 
     return images
+
+class CustomTensorDataset(Dataset):
+    def __init__(self, data, targets):
+        """
+        Args:
+            data (Tensor): Input data.
+            targets (Tensor or list): Corresponding labels.
+        """
+        self.data = data
+        self.targets = targets if isinstance(targets, torch.Tensor) else torch.tensor(targets, dtype=torch.long)
+
+    def __getitem__(self, index):
+        return self.data[index], self.targets[index]
+
+    def __len__(self):
+        return len(self.data)

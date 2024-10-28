@@ -313,7 +313,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             initial_with_random_indices = labeled_indices + list(add_indices)
             initial_with_random_embeddings = train_embeddings[initial_with_random_indices]
             torch.save(initial_with_random_embeddings, f"{dataset_name}_initial_with_random_embeddings.pt")
-                    
+
         # Use indices to extract labeled and unlabeled embeddings and labels
         labeled_embeddings = train_embeddings[labeled_indices]
         labeled_labels = train_labels[labeled_indices]
@@ -492,18 +492,20 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     if initial_only:
         initial_data = torch.load(f"{dataset_name}_initial_data.pt")
         train_labels = torch.load(f"{dataset_name}_initial_labels.pt")
-        initial_data = torch.from_numpy(train_labels).long()
-        train_dataset = TensorDataset(initial_data, train_labels)
+        initial_data = torch.stack(initial_data)
+        train_labels = torch.tensor(train_labels, dtype=torch.long)
+        train_dataset = CustomTensorDataset(initial_data, train_labels)
     elif initial_with_random:
         initial_with_random_data = torch.load(f"{dataset_name}_initial_with_random_data.pt")
         train_labels = torch.load(f"{dataset_name}_initial_with_random_labels.pt")
-        initial_data = torch.from_numpy(train_labels).long()
-        train_dataset = TensorDataset(initial_with_random_data, train_labels)
+        initial_with_random_data = torch.stack(initial_with_random_data)
+        train_labels = torch.tensor(train_labels, dtype=torch.long)
+        train_dataset = CustomTensorDataset(initial_with_random_data, train_labels)
 
     # Return evaluation dataset if required
     if return_eval_ds:
         if embed_input:
-            test_dataset_embeddings = TensorDataset(test_embeddings, test_labels)
+            test_dataset_embeddings = CustomTensorDataset(test_embeddings, test_labels)
             eval_loader = DataLoader(test_dataset_embeddings, batch_size=batch_size * 4, shuffle=False, num_workers=num_workers)
             num_samples = len(test_dataset_embeddings)
         else:
@@ -545,7 +547,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             subset_labels = all_labels[train_indices]
             
             # Create EmbeddingDataset and Dataloader for the client's data
-            train_dataset_embeddings = TensorDataset(subset_embeddings, subset_labels)
+            train_dataset_embeddings = CustomTensorDataset(subset_embeddings, subset_labels)
             train_loader = DataLoader(train_dataset_embeddings, batch_size=batch_size, num_workers=num_workers, shuffle=True)
             num_samples = len(train_indices)
         else:
