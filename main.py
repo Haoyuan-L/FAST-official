@@ -113,7 +113,12 @@ def run_with_different_configs(yaml_config_file):
                                  initial_only=config["initial_only"], initial_with_random=config["initial_with_random"])
 
         # Log the results of the experiment
-        fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_{config["uncertainty"]}_class_aware-{str(config["class_aware"])}_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}.log'
+        if config["initial_only"]:
+            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_initialOnly_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}.log'
+        elif config["initial_with_random"]:
+            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_initialRandom_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}.log'
+        else:
+            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_{config["uncertainty"]}_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}.log'
         log_results(history, config, fname)
 
 
