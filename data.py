@@ -306,7 +306,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             )
 
         # Extract and save embeddings for initial data
-        if not os.exists(f"{dataset_name}_initial_embeddings.pt"):
+        if not os.path.exists(f"{dataset_name}_initial_embeddings.pt"):
             initial_embeddings = train_embeddings[labeled_indices]
             torch.save(initial_embeddings, f"{dataset_name}_initial_embeddings.pt")
             # Extract and save embeddings for initial with random additional data
