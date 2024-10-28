@@ -256,7 +256,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
 
     if initial_only and os.path.exists(f"{dataset_name}_initial_data.pt"):
         pass
-    elif initial_with_random and os.path.exists(f"{dataset_name}_intial_with_random_data.pt"):
+    elif initial_with_random and os.path.exists(f"{dataset_name}_initial_with_random_data.pt"):
         pass
     elif os.path.exists(f"{dataset_name}_{uncertainty}_balance-{class_aware}_labels.npy"):
         all_labels = np.load(f"{dataset_name}_{uncertainty}_balance-{class_aware}_labels.npy")
@@ -295,8 +295,8 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         additional_labels = [labels[i] for i in add_indices]
         updated_data = initial_data + additional_data
         updated_labels = initial_labels + additional_labels
-        torch.save(updated_data, f"{dataset_name}_intial_with_random_data.pt")
-        torch.save(updated_labels, f"{dataset_name}_intial_with_random_labels.pt")
+        torch.save(updated_data, f"{dataset_name}_initial_with_random_data.pt")
+        torch.save(updated_labels, f"{dataset_name}_initial_with_random_labels.pt")
 
         # Utilize SIGLIP encoder to encode all the training data
         # Load the embeddings if they exist
