@@ -492,10 +492,12 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     if initial_only:
         initial_data = torch.load(f"{dataset_name}_initial_data.pt")
         train_labels = torch.load(f"{dataset_name}_initial_labels.pt")
+        initial_data = torch.from_numpy(train_labels).long()
         train_dataset = TensorDataset(initial_data, train_labels)
     elif initial_with_random:
         initial_with_random_data = torch.load(f"{dataset_name}_initial_with_random_data.pt")
         train_labels = torch.load(f"{dataset_name}_initial_with_random_labels.pt")
+        initial_data = torch.from_numpy(train_labels).long()
         train_dataset = TensorDataset(initial_with_random_data, train_labels)
 
     # Return evaluation dataset if required
