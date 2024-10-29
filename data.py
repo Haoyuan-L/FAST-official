@@ -195,6 +195,29 @@ def get_average_distance_logits(unlabeled_embeddings, labeled_embeddings, labele
     
     return average_distances
 
+def get_average_cosine_similarity_logits(unlabeled_embeddings, labeled_embeddings, labeled_labels, num_classes):
+    """
+    Calculation of logits based on the average cosine similarity from each unlabeled sample to each class.
+    """
+    # Normalize embeddings
+    unlabeled_norm = unlabeled_embeddings / (np.linalg.norm(unlabeled_embeddings, axis=1, keepdims=True) + 1e-10)
+    labeled_norm = labeled_embeddings / (np.linalg.norm(labeled_embeddings, axis=1, keepdims=True) + 1e-10)
+    
+    average_similarities = np.zeros((unlabeled_embeddings.shape[0], num_classes), dtype=np.float32)
+    
+    for cls in range(num_classes):
+        cls_embeddings = labeled_norm[labeled_labels == cls]
+        if cls_embeddings.shape[0] == 0:
+            raise ValueError(f"No samples found for class {cls}")
+        
+        # Compute cosine similarities
+        similarities = np.dot(unlabeled_norm, cls_embeddings.T)  # Shape: (N, M_cls)
+        
+        # Compute average similarity
+        average_similarities[:, cls] = similarities.mean(axis=1)
+    
+    return average_similarities
+
 def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, embed_input=False, encoder="SigLIP",
              split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm", active_oracle=True, 
              budget=0.1, initial_only=False, initial_with_random=False):
@@ -371,7 +394,9 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         # 1.Calculate logits based on the minimum distance from each unlabeled sample to each class
         #logits = get_min_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
         # 2. Based on average L2 distance
-        logits = get_average_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
+        #logits = get_average_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
+        # 3. Based on average cosine similarity
+        logits = get_average_cosine_similarity_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
 
         # Create all_labels array with both labeled and pseudo-labeled data
         all_labels = np.zeros(len(train_dataset), dtype=int)
