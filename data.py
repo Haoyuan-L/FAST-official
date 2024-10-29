@@ -172,6 +172,29 @@ def get_min_distance_logits(unlabeled_embeddings, labeled_embeddings, labeled_la
     
     return min_distances
 
+def get_average_distance_logits(unlabeled_embeddings, labeled_embeddings, labeled_labels, num_classes):
+    """
+    Calculate logits based on the average distance from each unlabeled sample to each class.
+    """
+    average_distances = np.zeros((unlabeled_embeddings.shape[0], num_classes), dtype=np.float32)
+    
+    for cls in range(num_classes):
+        cls_indices = np.where(labeled_labels == cls)[0]
+        cls_embeddings = labeled_embeddings[cls_indices]
+        if cls_embeddings.shape[0] == 0:
+            raise ValueError(f"No samples found for class {cls}")
+        
+        # Compute the differences between each unlabeled sample and all labeled samples in the class
+        # Shape: (N, M, D)
+        diff = unlabeled_embeddings[:, np.newaxis, :] - cls_embeddings[np.newaxis, :, :]
+        sq_distances = np.sum(diff ** 2, axis=2)  # Shape: (N, M)
+        distances = np.sqrt(sq_distances)  # Shape: (N, M)
+        
+        # Compute the average distance for each unlabeled sample to this class
+        average_distances[:, cls] = np.mean(distances, axis=1)
+    
+    return average_distances
+
 def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, embed_input=False, encoder="SigLIP",
              split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm", active_oracle=True, 
              budget=0.1, initial_only=False, initial_with_random=False):
@@ -345,8 +368,10 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         labeling_acc = corrects / len(unlabeled_ground_truth)
         print(f"Labeling Accuracy: {labeling_acc * 100:.2f}%")
 
-        # Calculate logits based on the minimum distance from each unlabeled sample to each class
-        logits = get_min_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
+        # 1.Calculate logits based on the minimum distance from each unlabeled sample to each class
+        #logits = get_min_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
+        # 2. Based on average L2 distance
+        logits = get_average_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
 
         # Create all_labels array with both labeled and pseudo-labeled data
         all_labels = np.zeros(len(train_dataset), dtype=int)
