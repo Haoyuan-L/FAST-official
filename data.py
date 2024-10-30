@@ -306,7 +306,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         pass
     elif initial_with_random and os.path.exists(f"{dataset_name}_initial_with_random_data.pt"):
         pass
-    elif os.path.exists(f"{dataset_name}_{uncertainty}_balance-{class_aware}__budget{budget}_labels.npy"):
+    elif os.path.exists(f"{dataset_name}_{uncertainty}_balance-{class_aware}_budget{budget}_labels.npy"):
         all_labels = np.load(f"{dataset_name}_{uncertainty}_balance-{class_aware}_budget{budget}_labels.npy")
     else:
         # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
@@ -513,7 +513,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
                     all_labels[uncertain_sample_indices] = oracle_annotation_labels
 
             # Save the updated labels
-            np.save(f"{dataset_name}_{uncertainty}_balance-{class_aware}__budget{budget}_labels.npy", all_labels)
+            np.save(f"{dataset_name}_{uncertainty}_balance-{class_aware}_budget{budget}_labels.npy", all_labels)
 
             # Labeling accuracy after the active learning round
             updated_unlabeled_labels = all_labels[unlabeled_indices]
