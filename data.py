@@ -199,7 +199,7 @@ def get_average_cosine_similarity_logits(unlabeled_embeddings, labeled_embedding
     """
     Calculation of logits based on the average cosine similarity from each unlabeled sample to each class.
     """
-    
+
     labeled_labels = labeled_labels.flatten()
     # Normalize embeddings
     unlabeled_norm = unlabeled_embeddings / (np.linalg.norm(unlabeled_embeddings, axis=1, keepdims=True) + 1e-10)
@@ -306,8 +306,8 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         pass
     elif initial_with_random and os.path.exists(f"{dataset_name}_initial_with_random_data.pt"):
         pass
-    elif os.path.exists(f"{dataset_name}_{uncertainty}_balance-{class_aware}_labels.npy"):
-        all_labels = np.load(f"{dataset_name}_{uncertainty}_balance-{class_aware}_labels.npy")
+    elif os.path.exists(f"{dataset_name}_{uncertainty}_balance-{class_aware}__budget{budget}_labels.npy"):
+        all_labels = np.load(f"{dataset_name}_{uncertainty}_balance-{class_aware}_budget{budget}_labels.npy")
     else:
         # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
         initial_labeled_ratio = 0.01
@@ -513,7 +513,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
                     all_labels[uncertain_sample_indices] = oracle_annotation_labels
 
             # Save the updated labels
-            np.save(f"{dataset_name}_{uncertainty}_balance-{class_aware}_labels.npy", all_labels)
+            np.save(f"{dataset_name}_{uncertainty}_balance-{class_aware}__budget{budget}_labels.npy", all_labels)
 
             # Labeling accuracy after the active learning round
             updated_unlabeled_labels = all_labels[unlabeled_indices]
@@ -585,7 +585,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         else:
             split_fn = get_split_fn(split)
             # Split data into client-specific subsets
-            train_indices = split_fn(idxs=train_dataset.targets, num_shards=num_clients,
+            train_indices = split_fn(idxs=extract_labels(train_dataset), num_shards=num_clients,
                                     num_samples=len(train_dataset), num_classes=num_classes, seed=seed)[int(id)]
         data_ratio = len(train_indices) / len(train_dataset)
 
