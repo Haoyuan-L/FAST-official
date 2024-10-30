@@ -199,8 +199,9 @@ def get_average_cosine_similarity_logits(unlabeled_embeddings, labeled_embedding
     """
     Calculation of logits based on the average cosine similarity from each unlabeled sample to each class.
     """
-    # Normalize embeddings
+    
     labeled_labels = labeled_labels.flatten()
+    # Normalize embeddings
     unlabeled_norm = unlabeled_embeddings / (np.linalg.norm(unlabeled_embeddings, axis=1, keepdims=True) + 1e-10)
     labeled_norm = labeled_embeddings / (np.linalg.norm(labeled_embeddings, axis=1, keepdims=True) + 1e-10)
     
