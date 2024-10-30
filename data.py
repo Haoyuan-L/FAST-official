@@ -61,6 +61,7 @@ def extract_labels(dataset):
         pass
     else:
         labels = np.array(labels)
+    labels = labels.flatten()
     return labels
 
 def compute_entropy(logits):
@@ -520,8 +521,11 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             corrects = np.sum(updated_unlabeled_labels == unlabeled_ground_truth)
             new_labeling_acc = corrects / len(unlabeled_ground_truth)
             print(f"Labeling Accuracy after first AL round: {new_labeling_acc * 100:.2f}%")
-    
-        train_dataset.targets = all_labels.tolist()
+
+        if hasattr(train_dataset, 'targets'):
+            train_dataset.targets = all_labels.tolist()
+        elif hasattr(train_dataset, 'labels'):
+            train_dataset.labels = all_labels.tolist()
 
     # Handle embedding of test dataset if embed_input is True
     if embed_input:
@@ -598,7 +602,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             else:
                 train_embeddings = torch.load(os.path.join(save_path, train_embeddings_fname)).float()
     
-            all_labels = torch.tensor(train_dataset.targets, dtype=torch.long)
+            all_labels = torch.tensor(extract_labels(train_dataset), dtype=torch.long)
             subset_embeddings = train_embeddings[train_indices]
             subset_labels = all_labels[train_indices]
             
