@@ -301,7 +301,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         num_classes = 200
     else:
         raise ValueError(f"Dataset {dataset_name} is not supported.")
-
+ 
     if initial_only and os.path.exists(f"{dataset_name}_initial_data.pt"):
         pass
     elif initial_with_random and os.path.exists(f"{dataset_name}_initial_with_random_data.pt"):
