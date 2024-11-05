@@ -15,7 +15,7 @@ class Server(fl.server.Server):
 		self.fl_method = fl_method
 		self.num_rounds = num_rounds
 		self.data_loader = data_loader
-		self.data, self.num_classes, self.num_samples = data_loader()
+		self.data, self.num_classes, self.num_samples = data_loader
 		self.embed_input = embed_input
 		if self.embed_input:
 			try:
