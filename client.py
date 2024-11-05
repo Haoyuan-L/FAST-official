@@ -2,14 +2,19 @@ import flwr as fl
 import torch
 import collections
 import torchmetrics
-import torch.optim as optim 
+import torch.optim as optim
+from data import *
 
 class Client(fl.client.NumPyClient):
 
-	def __init__(self, cid, dataset, model_loader, data_loader, embed_input=False, device='cuda', fl_method="fedavg"):
+	def __init__(self, cid, dataset, num_clients, model_loader, encoder, active_oracle, data_split, skewness_alpha, class_aware, uncertainty, 
+			  	 budget, initial_only, initial_with_random, embed_input=False, device='cuda', fl_method="fedavg"):
 		self.fl_method = fl_method
 		self.cid = cid
-		self.data, self.num_classes, self.num_samples, self.ratio = data_loader
+		self.data, self.num_classes, self.num_samples, self.ratio = get_data(dataset_name=dataset, id=cid, num_clients=num_clients, 
+																	embed_input=embed_input, encoder=encoder, active_oracle=active_oracle,
+                                                   					split=data_split, alpha=skewness_alpha, class_aware=class_aware, uncertainty=uncertainty, budget=budget,
+                                                   					initial_only=initial_only, initial_with_random=initial_with_random)
 		self.embed_input = embed_input
 		# Determine input shape based on embed_input flag
 		if self.embed_input:
