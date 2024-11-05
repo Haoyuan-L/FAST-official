@@ -430,45 +430,11 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             num_query_samples = int(query_ratio * len(unlabeled_indices))
 
             if uncertainty.lower() == "random":
-                if class_aware:
-                    # Class-aware random selection
-                    predicted_labels = np.argmax(logits, axis=1)
-                    num_classes = logits.shape[1]
-                    num_query_samples_per_class = num_query_samples // num_classes
-                    random_sample_indices = []
-
-                    for c in range(num_classes):
-                        # Get indices of samples predicted to belong to class c
-                        class_member_mask = predicted_labels == c
-                        cls_indices = np.where(class_member_mask)[0]
-                        if len(cls_indices) == 0:
-                            continue  # Skip if no samples for this class
-                        num_samples = min(len(cls_indices), num_query_samples_per_class)
-                        selected_indices = np.random.choice(cls_indices, size=num_samples, replace=False)
-                        random_sample_indices.extend(selected_indices.tolist())
-
-                    # Handle any remaining samples to meet the total query quota
-                    total_selected = len(random_sample_indices)
-                    if total_selected < num_query_samples:
-                        remaining_samples = num_query_samples - total_selected
-                        selected_set = set(random_sample_indices)
-                        remaining_indices = [i for i in range(len(unlabeled_indices)) if i not in selected_set]
-                        if remaining_indices:
-                            additional_selected = np.random.choice(remaining_indices, size=remaining_samples, replace=False).tolist()
-                            random_sample_indices.extend(additional_selected)
-                    elif total_selected > num_query_samples:
-                        random_sample_indices = random_sample_indices[:num_query_samples]
-
-                    # Map back to dataset indices
-                    random_sample_dataset_indices = np.array(unlabeled_indices)[random_sample_indices]
-                    oracle_annotation_labels = unlabeled_ground_truth[random_sample_indices]
-                    all_labels[random_sample_dataset_indices] = oracle_annotation_labels.flatten()
-                else:
-                    # Non-class-aware random selection
-                    random_indices = np.random.choice(len(unlabeled_indices), size=num_query_samples, replace=False)
-                    random_sample_indices = np.array(unlabeled_indices)[random_indices]
-                    oracle_annotation_labels = unlabeled_ground_truth[random_indices]
-                    all_labels[random_sample_indices] = oracle_annotation_labels
+                # Non-class-aware random selection
+                random_indices = np.random.choice(len(unlabeled_indices), size=num_query_samples, replace=False)
+                random_sample_indices = np.array(unlabeled_indices)[random_indices]
+                oracle_annotation_labels = unlabeled_ground_truth[random_indices]
+                all_labels[random_sample_indices] = oracle_annotation_labels
 
             else:
                 # Uncertainty-based selection
