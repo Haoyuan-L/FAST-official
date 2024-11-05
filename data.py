@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import contextlib
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
 from medmnist.dataset import PathMNIST, DermaMNIST
 from torchvision.datasets import CIFAR10, SVHN, CIFAR100
 import torchvision.transforms as transforms
@@ -230,7 +230,7 @@ def train_linear_classifier(labeled_embeddings, labeled_labels, num_classes, dev
     # Convert to torch tensors
     embeddings = torch.tensor(labeled_embeddings, dtype=torch.float32)
     labels = torch.tensor(labeled_labels, dtype=torch.long)
-    dataset = TensorDataset(embeddings, labels)
+    dataset = CustomTensorDataset(embeddings, labels)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     input_dim = embeddings.shape[1]
@@ -263,7 +263,7 @@ def get_linear_classifier_logits(model, unlabeled_embeddings, device, batch_size
     Obtains logits from the linear classifier for unlabeled embeddings.
     """
     embeddings = torch.tensor(unlabeled_embeddings, dtype=torch.float32)
-    dataset = TensorDataset(embeddings)
+    dataset = CustomTensorDataset(embeddings)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     logits_list = []
@@ -467,7 +467,6 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         # 4. Based on linear classifier
         weak_labels = np.load(f"{dataset_name}_None_labels.npy")
         weak_labels = weak_labels.flatten()
-        weak_labels = torch.from_numpy(weak_labels).long()
         linear_model_fp = f"{dataset_name}_linear_classifier.pth"
         if os.path.exists(linear_model_fp):
             input_dim = labeled_embeddings_np.shape[1]
