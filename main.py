@@ -39,12 +39,12 @@ def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split
     def create_client(cid):
         time.sleep(int(cid) * 0.75)
         return Client(cid=int(cid), dataset=dataset, model_loader=network_fn, embed_input=embed_input, fl_method=fl_method,
-                      num_clients=num_clients, encoder=encoder, active_oracle=active_oracle, split=data_split, alpha=skewness_alpha, 
+                      num_clients=num_clients, encoder=encoder, active_oracle=active_oracle, data_split=data_split, skewness_alpha=skewness_alpha, 
                       class_aware=class_aware, uncertainty=uncertainty, budget=budget, initial_only=initial_only, initial_with_random=initial_with_random)
 
     def create_server(init_model=None):
         return Server(num_rounds=num_rounds, num_clients=num_clients, embed_input=embed_input, fl_method=fl_method, participation=participation, 
-                      model_loader=network_fn, dataset=dataset, encoder=encoder, active_oracle=active_oracle, split=data_split, alpha=skewness_alpha, 
+                      model_loader=network_fn, dataset=dataset, encoder=encoder, active_oracle=active_oracle, data_split=data_split, skewness_alpha=skewness_alpha, 
                       uncertainty=uncertainty, class_aware=class_aware, return_eval_ds=True, budget=budget, initial_only=initial_only, initial_with_random=initial_with_random, init_model=init_model)
     ray.shutdown() 
     ray.init()
