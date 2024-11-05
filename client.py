@@ -8,10 +8,10 @@ from data import *
 class Client(fl.client.NumPyClient):
 
 	def __init__(self, cid, dataset, num_clients, model_loader, encoder, active_oracle, data_split, skewness_alpha, class_aware, uncertainty, 
-			  	 budget, initial_only, initial_with_random, embed_input=False, device='cuda', fl_method="fedavg"):
+			  	 budget, initial_only, initial_with_random, embed_input=False, device='cuda', fl_method="fedavg", seed=42):
 		self.fl_method = fl_method
 		self.cid = cid
-		self.data, self.num_classes, self.num_samples, self.ratio = get_data(dataset_name=dataset, id=cid, num_clients=num_clients, 
+		self.data, self.num_classes, self.num_samples, self.ratio = get_data(dataset_name=dataset, id=cid, num_clients=num_clients, seed=seed,
 																	embed_input=embed_input, encoder=encoder, active_oracle=active_oracle,
                                                    					split=data_split, alpha=skewness_alpha, class_aware=class_aware, uncertainty=uncertainty, budget=budget,
                                                    					initial_only=initial_only, initial_with_random=initial_with_random)
