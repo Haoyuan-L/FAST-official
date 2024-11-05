@@ -467,6 +467,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         # 4. Based on linear classifier
         weak_labels = np.load(f"{dataset_name}_None_labels.npy")
         weak_labels = weak_labels.flatten()
+        weak_labels = torch.from_numpy(weak_labels).long()
         linear_model_fp = f"{dataset_name}_linear_classifier.pth"
         if os.path.exists(linear_model_fp):
             input_dim = labeled_embeddings_np.shape[1]
