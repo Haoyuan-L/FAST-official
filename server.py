@@ -9,16 +9,16 @@ from utils import get_learning_rate
 
 class Server(fl.server.Server):
 
-	def __init__(self, dataset, model_loader, encoder, active_oracle, data_split, skewness_alpha, class_aware, uncertainty, budget, 
+	def __init__(self, dataset, model_loader, encoder, active_oracle, data_split, skewness_alpha, class_aware, uncertainty, budget, split,
 			  	 return_eval_ds, initial_only, initial_with_random, num_rounds, num_clients=10, embed_input=False,
 		participation=1.0, init_model=None, log_level=logging.INFO,
 		initial_lr=1e-3, decay_factor=0.1, num_decays=3, fl_method="fedavg"):
 		
 		self.fl_method = fl_method
 		self.num_rounds = num_rounds
-		self.data, self.num_classes, self.num_samples = get_data(dataset_name=dataset, num_clients=num_clients, 
-																 embed_input=embed_input, encoder=encoder, active_oracle=active_oracle,
-                                                   				 split=data_split, alpha=skewness_alpha, class_aware=class_aware, uncertainty=uncertainty, budget=budget,
+		self.data, self.num_classes, self.num_samples = get_data(dataset_name=dataset, num_clients=num_clients, embed_input=embed_input, 
+														   		 encoder=encoder, active_oracle=active_oracle,split=data_split, 
+																 alpha=skewness_alpha, class_aware=class_aware, uncertainty=uncertainty, budget=budget,
                                                    				 return_eval_ds=return_eval_ds, initial_only=initial_only, initial_with_random=initial_with_random)
 		
 		self.embed_input = embed_input
