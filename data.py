@@ -1,5 +1,7 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 import contextlib
 from torch.utils.data import DataLoader, TensorDataset
 from medmnist.dataset import PathMNIST, DermaMNIST
@@ -221,6 +223,58 @@ def get_average_cosine_similarity_logits(unlabeled_embeddings, labeled_embedding
     
     return average_similarities
 
+def train_linear_classifier(labeled_embeddings, labeled_labels, num_classes, device, epochs=20, batch_size=128, learning_rate=1e-3):
+    """
+    Trains a linear classifier on the labeled embeddings.
+    """
+    # Convert to torch tensors
+    embeddings = torch.tensor(labeled_embeddings, dtype=torch.float32)
+    labels = torch.tensor(labeled_labels, dtype=torch.long)
+    dataset = TensorDataset(embeddings, labels)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    input_dim = embeddings.shape[1]
+    model = nn.Linear(input_dim, num_classes).to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    model.train()
+    for epoch in range(epochs):
+        epoch_loss = 0.0
+        for batch_embeddings, batch_labels in dataloader:
+            batch_embeddings = batch_embeddings.to(device)
+            batch_labels = batch_labels.to(device)
+
+            optimizer.zero_grad()
+            outputs = model(batch_embeddings)
+            loss = criterion(outputs, batch_labels)
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item() * batch_embeddings.size(0)
+        avg_loss = epoch_loss / len(dataloader.dataset)
+        print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}")
+
+    model.eval()
+    return model
+
+def get_linear_classifier_logits(model, unlabeled_embeddings, device, batch_size=128):
+    """
+    Obtains logits from the linear classifier for unlabeled embeddings.
+    """
+    embeddings = torch.tensor(unlabeled_embeddings, dtype=torch.float32)
+    dataset = TensorDataset(embeddings)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+
+    logits_list = []
+    with torch.no_grad():
+        for (batch_embeddings,) in dataloader:
+            batch_embeddings = batch_embeddings.to(device)
+            outputs = model(batch_embeddings)
+            logits_list.append(outputs.cpu().numpy())
+    logits = np.vstack(logits_list)
+    return logits
+
 def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False, batch_size=128, embed_input=False, encoder="SigLIP",
              split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm", active_oracle=True, 
              budget=0.1, initial_only=False, initial_with_random=False):
@@ -394,19 +448,35 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         labeling_acc = corrects / len(unlabeled_ground_truth)
         print(f"Labeling Accuracy: {labeling_acc * 100:.2f}%")
 
-        # 1.Calculate logits based on the minimum distance from each unlabeled sample to each class
-        #logits = get_min_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
-        # 2. Based on average L2 distance
-        #logits = get_average_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
-        # 3. Based on average cosine similarity
-        logits = get_average_cosine_similarity_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
-
         # Create all_labels array with both labeled and pseudo-labeled data
         all_labels = np.zeros(len(train_dataset), dtype=int)
         all_labels[labeled_indices] = labeled_labels.flatten()
         all_labels[unlabeled_indices] = predicted_labels
         # save the pseudo labels
         np.save(f"{dataset_name}_None_labels.npy", all_labels)
+
+        # 1.Calculate logits based on the minimum distance from each unlabeled sample to each class
+        #logits = get_min_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
+
+        # 2. Based on average L2 distance
+        #logits = get_average_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
+
+        # 3. Based on average cosine similarity
+        #logits = get_average_cosine_similarity_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
+
+        # 4. Based on linear classifier
+        weak_labels = np.load(f"{dataset_name}_None_labels.npy")
+        weak_labels = weak_labels.flatten()
+        linear_model_fp = f"{dataset_name}_linear_classifier.pth"
+        if os.path.exists(linear_model_fp):
+            input_dim = labeled_embeddings_np.shape[1]
+            linear_model = nn.Linear(input_dim, num_classes).to(device)
+            linear_model.load_state_dict(torch.load(linear_model_fp, map_location=device))
+            linear_model.eval()
+        else:
+            linear_model = train_linear_classifier(labeled_embeddings_np, weak_labels, num_classes=num_classes, device=device)
+            torch.save(linear_model.state_dict(), linear_model_fp)
+        logits = get_linear_classifier_logits(linear_model, unlabeled_embeddings_np, device)
 
         if active_oracle:
             # Load uncertainty method
@@ -435,7 +505,6 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
                 random_sample_indices = np.array(unlabeled_indices)[random_indices]
                 oracle_annotation_labels = unlabeled_ground_truth[random_indices]
                 all_labels[random_sample_indices] = oracle_annotation_labels
-
             else:
                 # Uncertainty-based selection
                 uncertainty_score = uncertainty_func(logits)
