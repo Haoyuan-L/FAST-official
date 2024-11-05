@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import contextlib
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 from medmnist.dataset import PathMNIST, DermaMNIST
 from torchvision.datasets import CIFAR10, SVHN, CIFAR100
 import torchvision.transforms as transforms
@@ -263,7 +263,7 @@ def get_linear_classifier_logits(model, unlabeled_embeddings, device, batch_size
     Obtains logits from the linear classifier for unlabeled embeddings.
     """
     embeddings = torch.tensor(unlabeled_embeddings, dtype=torch.float32)
-    dataset = CustomTensorDataset(embeddings)
+    dataset = TensorDataset(embeddings)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     logits_list = []
