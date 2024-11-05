@@ -9,7 +9,7 @@ from utils import get_learning_rate
 
 class Server(fl.server.Server):
 
-	def __init__(self, dataset, model_loader, encoder, active_oracle, data_split, skewness_alpha, class_aware, uncertainty, budget, split,
+	def __init__(self, dataset, model_loader, encoder, active_oracle, data_split, skewness_alpha, class_aware, uncertainty, budget,
 			  	 return_eval_ds, initial_only, initial_with_random, num_rounds, num_clients=10, embed_input=False,
 		participation=1.0, init_model=None, log_level=logging.INFO,
 		initial_lr=1e-3, decay_factor=0.1, num_decays=3, fl_method="fedavg"):
