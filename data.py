@@ -462,21 +462,21 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         #logits = get_average_distance_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
 
         # 3. Based on average cosine similarity
-        #logits = get_average_cosine_similarity_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
+        logits = get_average_cosine_similarity_logits(unlabeled_embeddings_np, labeled_embeddings_np, labeled_labels, num_classes)
 
         # 4. Based on linear classifier
-        weak_labels = np.load(f"{dataset_name}_None_labels.npy")
-        weak_labels = weak_labels.flatten()
-        linear_model_fp = f"{dataset_name}_linear_classifier.pth"
-        if os.path.exists(linear_model_fp):
-            input_dim = labeled_embeddings_np.shape[1]
-            linear_model = nn.Linear(input_dim, num_classes).to(device)
-            linear_model.load_state_dict(torch.load(linear_model_fp, map_location=device))
-            linear_model.eval()
-        else:
-            linear_model = train_linear_classifier(labeled_embeddings_np, weak_labels, num_classes=num_classes, device=device)
-            torch.save(linear_model.state_dict(), linear_model_fp)
-        logits = get_linear_classifier_logits(linear_model, unlabeled_embeddings_np, device)
+#        weak_labels = np.load(f"{dataset_name}_None_labels.npy")
+#        weak_labels = weak_labels.flatten()
+#        linear_model_fp = f"{dataset_name}_linear_classifier.pth"
+#        if os.path.exists(linear_model_fp):
+#            input_dim = labeled_embeddings_np.shape[1]
+#            linear_model = nn.Linear(input_dim, num_classes).to(device)
+#            linear_model.load_state_dict(torch.load(linear_model_fp, map_location=device))
+#            linear_model.eval()
+#        else:
+#            linear_model = train_linear_classifier(labeled_embeddings_np, weak_labels, num_classes=num_classes, device=device)
+#            torch.save(linear_model.state_dict(), linear_model_fp)
+#        logits = get_linear_classifier_logits(linear_model, unlabeled_embeddings_np, device)
 
         if active_oracle:
             # Load uncertainty method

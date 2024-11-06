@@ -187,7 +187,7 @@ class LinearProbe(nn.Module):
     
 """ Helper function to get the network model """
 
-def get_resnet18_network(num_classes=10, weights_fp=None):
+def get_resnet18_network(input_shape=None, num_classes=10, weights_fp=None):
     model = ResNet18(num_classes=num_classes)
     if weights_fp is not None:
         model.load_state_dict(torch.load(weights_fp))
