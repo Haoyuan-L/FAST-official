@@ -140,7 +140,7 @@ class ResNet(nn.Module):
         out = self.layer4(out)
        # embedding_output = out.view(out.size(0), -1)
        # print(embedding_output.shape)
-        out = F.avg_pool2d(out, 4)
+        out = F.adaptive_avg_pool2d(out, 1)
         out = out.view(out.size(0), -1)
         embedding_output = out
         out = self.linear(out)
