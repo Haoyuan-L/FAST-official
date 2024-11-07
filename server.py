@@ -11,7 +11,7 @@ class Server(fl.server.Server):
 
 	def __init__(self, dataset, model_loader, encoder, active_oracle, data_split, skewness_alpha, class_aware, uncertainty, budget,
 			  	 return_eval_ds, initial_only, initial_with_random, num_rounds, num_clients=10, embed_input=False, participation=1.0, 
-				 init_model=None, log_level=logging.INFO, initial_lr=1e-3, decay_factor=0.1, num_decays=3, fl_method="fedavg", seed=42):
+				 init_model=None, log_level=logging.INFO, initial_lr=1e-3, decay_factor=0.1, num_decays=3, fl_method="fedavg", seed=42, local_epochs=5):
 		
 		self.fl_method = fl_method
 		self.num_rounds = num_rounds
@@ -39,7 +39,7 @@ class Server(fl.server.Server):
 		self.initial_lr = initial_lr
 		self.decay_factor = decay_factor
 		self.num_decays = num_decays
-		self.clients_config = {"epochs":5, "lr":initial_lr}
+		self.clients_config = {"epochs":local_epochs, "lr":initial_lr}
 		self.num_clients = num_clients
 		self.participation = participation
 		self.device = 'cuda' if torch.cuda.is_available() else 'cpu'

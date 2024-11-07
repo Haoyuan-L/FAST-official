@@ -22,7 +22,7 @@ from client import Client
 from server import Server
 
 def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split='iid', max_parallel_executions=5, active_oracle=True,
-                   timeout=1500, init_model=None, dataset="cifar10", skewness_alpha=None, class_aware=False, uncertainty="norm", 
+                   timeout=1500, init_model=None, dataset="cifar10", skewness_alpha=None, class_aware=False, uncertainty="norm", local_epochs=5,
                    model="resnet18", encoder="SigLIP", budget=0.1, fl_method="fedavg", initial_only=False, initial_with_random=False, seed=42):
     
     embed_input = False
@@ -47,7 +47,8 @@ def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split
     def create_server(init_model=None):
         return Server(num_rounds=num_rounds, num_clients=num_clients, embed_input=embed_input, fl_method=fl_method, participation=participation, seed=seed,
                       model_loader=network_fn, dataset=dataset, encoder=encoder, active_oracle=active_oracle, data_split=data_split, skewness_alpha=skewness_alpha, 
-                      uncertainty=uncertainty, class_aware=class_aware, return_eval_ds=True, budget=budget, initial_only=initial_only, initial_with_random=initial_with_random, init_model=init_model)
+                      uncertainty=uncertainty, class_aware=class_aware, return_eval_ds=True, budget=budget, initial_only=initial_only, initial_with_random=initial_with_random, 
+                      local_epochs=local_epochs, init_model=init_model)
     ray.shutdown() 
     ray.init()
     total_resources = ray.cluster_resources()
@@ -104,7 +105,7 @@ def run_with_different_configs(yaml_config_file):
         torch.cuda.manual_seed(config["seed"])
         # Run the experiment with current configuration
         history = run_experiment(num_rounds=config["num_rounds"], num_clients=config["num_clients"], model=config["model"],
-                                 data_split=config["data_split"], participation=config["participation"],
+                                 data_split=config["data_split"], participation=config["participation"], local_epochs=config["local_epochs"],
                                  max_parallel_executions=config["max_parallel_executions"], dataset=config["dataset"],
                                  skewness_alpha=config["skewness_alpha"], class_aware=config["class_aware"], uncertainty=config["uncertainty"],
                                  active_oracle=config["active_oracle"], encoder=config["encoder"], budget=config["budget"], fl_method=config["fl_method"],
@@ -112,11 +113,11 @@ def run_with_different_configs(yaml_config_file):
 
         # Log the results of the experiment
         if config["initial_only"]:
-            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_initialOnly_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}.log'
+            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_initialOnly_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}_local_epochs{config["local_epochs"]}.log'
         elif config["initial_with_random"]:
-            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_initialRandom_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}.log'
+            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_initialRandom_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}_local_epochs{config["local_epochs"]}.log'
         else:
-            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_{config["uncertainty"]}_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}.log'
+            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_{config["uncertainty"]}_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}_local_epochs{config["local_epochs"]}.log'
         log_results(history, config, fname)
 
 
