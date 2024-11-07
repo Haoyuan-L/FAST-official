@@ -28,6 +28,8 @@ def run_experiment(num_rounds=100, num_clients=10, participation=1.0, data_split
     embed_input = False
     if model == "resnet18":
         network_fn = network.get_resnet18_network
+    elif model == "resnet8":
+        network_fn = network.get_resnet8_network
     elif model == "cnn4":
         network_fn = network.get_cnn4_network
     elif model == "linear":
