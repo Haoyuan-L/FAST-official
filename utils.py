@@ -44,7 +44,7 @@ def create_imbalanced_shards(idxs, num_shards, num_samples, num_classes, skewnes
     data_distribution = np.random.choice(a=np.arange(0,num_shards), size=num_samples, p=np.random.dirichlet(np.repeat(skewness, num_shards))).astype(int)
     return {id:list(np.squeeze(np.argwhere((np.squeeze([data_distribution==id])==True)))) for id in range(num_shards)}
 
-def create_noniid_shards(idxs, num_shards, num_samples, num_classes, skewness=0.5, seed=1,):
+def create_noniid_shards(idxs, num_shards, num_samples, num_classes, skewness=0.1, seed=1,):
     np.random.seed(seed)
     partitions = {}
     min_size = 0
