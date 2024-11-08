@@ -363,6 +363,8 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         pass
     elif os.path.exists(f"{dataset_name}_{uncertainty}_balance-{class_aware}_budget{budget}_labels.npy"):
         all_labels = np.load(f"{dataset_name}_{uncertainty}_balance-{class_aware}_budget{budget}_labels.npy")
+    elif active_oracle == False and os.path.exists(f"{dataset_name}_None_labels.npy"):
+        all_labels = np.load(f"{dataset_name}_None_labels.npy")
     else:
         # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
         initial_labeled_ratio = 0.01
@@ -557,10 +559,10 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             new_labeling_acc = corrects / len(unlabeled_ground_truth)
             print(f"Labeling Accuracy after first AL round: {new_labeling_acc * 100:.2f}%")
 
-        if hasattr(train_dataset, 'targets'):
-            train_dataset.targets = all_labels.tolist()
-        elif hasattr(train_dataset, 'labels'):
-            train_dataset.labels = all_labels.tolist()
+    if hasattr(train_dataset, 'targets'):
+        train_dataset.targets = all_labels.tolist()
+    elif hasattr(train_dataset, 'labels'):
+        train_dataset.labels = all_labels.tolist()
 
     # Handle embedding of test dataset if embed_input is True
     if embed_input:
