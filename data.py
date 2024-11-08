@@ -563,9 +563,9 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             print(f"Labeling Accuracy after first AL round: {new_labeling_acc * 100:.2f}%")
 
     if hasattr(train_dataset, 'targets'):
-        train_dataset.targets = all_labels.tolist()
+        train_dataset.targets = all_labels
     elif hasattr(train_dataset, 'labels'):
-        train_dataset.labels = all_labels.tolist()
+        train_dataset.labels = all_labels
 
     # Handle embedding of test dataset if embed_input is True
     if embed_input:
