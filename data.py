@@ -289,7 +289,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     elif encoder == "RN50":
         model, _, preprocess = open_clip.create_model_and_transforms('RN50', 'openai')
     elif encoder == "CLIP":
-        model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16', 'claion2b_s34b_b88klip')
+        model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16', 'openai')
     elif encoder == "EvaCLIP":
         model, _, preprocess = open_clip.create_model_and_transforms('EVA02-L-14', 'merged2b_s4b_b131k')
     elif encoder == "DINOv2":
