@@ -286,10 +286,12 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if encoder == "SigLIP":
         model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16-SigLIP-512', 'webli')
+    elif encoder == "RN50":
+        model, _, preprocess = open_clip.create_model_and_transforms('RN50', 'openai')
     elif encoder == "CLIP":
         model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16', 'claion2b_s34b_b88klip')
     elif encoder == "EvaCLIP":
-        model, _, preprocess = open_clip.create_model_and_transforms('EVA02-B-16', 'merged2b_s8b_b131k')
+        model, _, preprocess = open_clip.create_model_and_transforms('EVA02-L-14', 'merged2b_s4b_b131k')
     elif encoder == "DINOv2":
         model = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitb14')
         # Define the preprocessing transforms
