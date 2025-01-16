@@ -113,11 +113,11 @@ def run_with_different_configs(yaml_config_file):
 
         # Log the results of the experiment
         if config["initial_only"]:
-            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_initialOnly_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}_local_epochs{config["local_epochs"]}.log'
+            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_initialOnly_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}_local_epochs{config["local_epochs"]}_clients-{config["num_clients"]}.log'
         elif config["initial_with_random"]:
-            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_initialRandom_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}_local_epochs{config["local_epochs"]}.log'
+            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_initialRandom_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}_local_epochs{config["local_epochs"]}_clients-{config["num_clients"]}.log'
         else:
-            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_{config["uncertainty"]}_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}_local_epochs{config["local_epochs"]}.log'
+            fname = f'{config["model"]}_{config["dataset"]}_{config["data_split"]}_{config["uncertainty"]}_Oracle-{str(config["active_oracle"])}_{config["encoder"]}_budget-{config["budget"]}_{config["fl_method"]}_local_epochs{config["local_epochs"]}_clients-{config["num_clients"]}.log'
         log_results(history, config, fname)
 
 

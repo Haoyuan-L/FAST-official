@@ -28,19 +28,19 @@ def get_transforms(dataset_name, augmentation=True):
     if augmentation:
         if dataset_name.lower() == "tiny-imagenet":
             data_transform = [
-                            #transforms.RandomCrop(64, padding=4),
+                            transforms.RandomCrop(64, padding=4),
                             transforms.RandomHorizontalFlip(), 
                             transforms.ToTensor(), 
                             transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
         elif dataset_name.lower() in ["cifar10", "cifar100", "svhn"]:
             data_transform = [
-                            #transforms.RandomCrop(32, padding=4),
+                            transforms.RandomCrop(32, padding=4),
                             transforms.RandomHorizontalFlip(), 
                             transforms.ToTensor(), 
                             transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
         else:
             data_transform = [
-                            #transforms.RandomCrop(28, padding=4),
+                            transforms.RandomCrop(28, padding=4),
                             transforms.RandomHorizontalFlip(), 
                             transforms.ToTensor(), 
                             transforms.Normalize(mean=MEAN[dataset_name], std=STD[dataset_name])]
