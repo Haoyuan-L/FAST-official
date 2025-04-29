@@ -1,0 +1,37 @@
+# General configuration
+seed: 42
+device: 'cuda:0'  # 'cuda:0' or 'cpu'
+
+# Dataset configuration
+dataset: 'cifar10'  # Options: 'cifar10', 'svhn', 'pathmnist', 'dermamnist', 'organamnist'
+data_dir: './data'
+partition: 'dir'    # Options: 'dir' (Dirichlet) or 'shard'
+alpha: 0.1         # Concentration parameter for Dirichlet distribution (lower means more heterogeneity)
+num_classes_per_user: 2  # For shard partition
+
+# Active learning configuration
+initial_budget: 0.05  # Initial labeling budget as a fraction of total data
+query_budget: 0.05    # Query budget per round as a fraction of total data
+end_ratio: 0.4        # End ratio for stopping active learning
+al_method: 'logo'     # Options: 'logo', 'random', 'entropy', 'coreset', 'badge', 'gcnal', 'alfamix'
+query_model_mode: 'both'  # Options: 'global', 'local_only', 'both' (for logo)
+
+# Federated learning configuration
+num_clients: 10
+num_rounds: 100
+local_epochs: 5
+batch_size: 64
+test_batch_size: 64
+lr: 0.01
+momentum: 0.9
+weight_decay: 0.0001
+fl_strategy: 'fedavg'  # Options: 'fedavg', 'fedprox'
+mu: 0.01  # For FedProx
+
+# Model configuration
+model: 'cnn4conv'  # Options: 'cnn4conv', 'resnet18', 'mobilenet'
+reset: 'random'    # Options: 'random', 'continue'
+
+# Logging
+log_interval: 10
+save_dir: './results'
