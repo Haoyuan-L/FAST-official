@@ -44,12 +44,16 @@ def main():
     # Partition dataset among clients
     if args_dict.partition == 'dir':
         # Use Dirichlet distribution for non-IID data
-        client_data_dict = dir_partition(dataset_train, args_dict.num_clients, args_dict.alpha)
+        client_data_dict = dir_partition(dataset_train, args_dict.num_clients, args_dict.alpha, equal_samples=True)
     elif args_dict.partition == 'shard':
         # Use shard partitioning for non-IID data
         client_data_dict = shard_partition(dataset_train, args_dict.num_clients, args_dict.num_classes_per_user)
     else:
         raise ValueError(f"Unsupported partition method: {args_dict.partition}")
+    
+    # Verify equal distribution
+    for cid in range(args_dict.num_clients):
+        print(f"Client {cid} data size: {len(client_data_dict[cid])}")
     
     # Initialize unlabeled and labeled data indices for each client
     client_unlabeled_dict = {}
@@ -88,6 +92,9 @@ def main():
     
     # Initialize server
     server = FedAvgServer(args_dict)
+    
+    # Create global model for evaluation
+    global_model = args_dict.get_model_fn()
     
     # Define client function
     def client_fn(cid):
@@ -146,41 +153,91 @@ def main():
                 acc_values = history.metrics_distributed['accuracy']
                 if acc_values and len(acc_values) > 0:
                     # Extract the accuracy value from the last tuple (round_num, accuracy)
-                    accuracy = acc_values[-1][1]
-                    server.logger.info(f"Extracted accuracy from distributed metrics: {accuracy:.4f}")
+                    training_accuracy = acc_values[-1][1]
+                    server.logger.info(f"Extracted training accuracy from distributed metrics: {training_accuracy:.4f}")
         except Exception as e:
             server.logger.error(f"Error extracting distributed accuracy: {e}")
         
-        # Try to extract from centralized metrics as backup
+        # Get final global model parameters from the server
         try:
-            if history.metrics_centralized and len(history.metrics_centralized) > 0:
-                metrics_centralized = history.metrics_centralized[-1][1]
-                if 'accuracy' in metrics_centralized:
-                    accuracy = metrics_centralized['accuracy']
-                if 'loss' in metrics_centralized:
-                    loss = metrics_centralized['loss']
-                server.logger.info(f"Extracted metrics from centralized metrics: Accuracy={accuracy:.4f}, Loss={loss:.4f}")
+            # Access parameters from the FL strategy
+            if hasattr(fl_strategy, 'parameters'):
+                global_params = fl_strategy.parameters
+                
+                # Update the global model with the final parameters
+                global_state_dict = OrderedDict(
+                    zip(global_model.state_dict().keys(), 
+                        [torch.tensor(v) for v in global_params])
+                )
+                global_model.load_state_dict(global_state_dict, strict=True)
+                
+                # Move model to correct device
+                global_model.to(args_dict.device)
+                
+                # Evaluate the global model directly
+                global_model.eval()
+                test_loader = torch.utils.data.DataLoader(
+                    dataset_test, 
+                    batch_size=args_dict.test_batch_size, 
+                    shuffle=False
+                )
+                
+                correct = 0
+                total_loss = 0
+                with torch.no_grad():
+                    for data, target in test_loader:
+                        data, target = data.to(args_dict.device), target.to(args_dict.device)
+                        output, _ = global_model(data)
+                        loss = torch.nn.functional.cross_entropy(output, target, reduction='sum').item()
+                        total_loss += loss
+                        pred = output.argmax(dim=1, keepdim=True)
+                        correct += pred.eq(target.view_as(pred)).sum().item()
+                
+                test_loss = total_loss / len(test_loader.dataset)
+                test_accuracy = correct / len(test_loader.dataset)
+                
+                server.logger.info(f"Direct global model evaluation: Accuracy={test_accuracy:.4f}, Loss={test_loss:.4f}")
+                
+                # Use this as our official accuracy and loss
+                accuracy = test_accuracy
+                loss = test_loss
+            else:
+                server.logger.error("FL strategy does not have parameters attribute")
+                
+                # Fallback to client evaluation
+                temp_client = client_fn("0")
+                # Make sure the client has the latest global model parameters
+                if hasattr(fl_strategy, "parameters_aggregated"):
+                    temp_client.set_parameters(fl_strategy.parameters_aggregated)
+                test_accuracy, test_loss = temp_client.test(dataset_test)
+                
+                server.logger.info(f"Fallback client evaluation: Accuracy={test_accuracy:.4f}, Loss={test_loss:.4f}")
+                accuracy = test_accuracy
+                loss = test_loss
+                
         except Exception as e:
-            server.logger.error(f"Error extracting centralized metrics: {e}")
+            server.logger.error(f"Error in global model evaluation: {e}")
+            
+            # Try the old evaluation method as fallback
+            try:
+                # Create a temporary client to evaluate the global model
+                temp_client = client_fn("0")
+                # Ensure we set the parameters from the latest round
+                if hasattr(fl_strategy, "parameters_aggregated"):
+                    temp_client.set_parameters(fl_strategy.parameters_aggregated)
+                test_accuracy, test_loss = temp_client.test(dataset_test)
+                server.logger.info(f"Fallback test evaluation: Accuracy={test_accuracy:.4f}, Loss={test_loss:.4f}")
+                
+                # Use this more reliable accuracy
+                accuracy = test_accuracy
+                loss = test_loss
+            except Exception as e2:
+                server.logger.error(f"Error in fallback evaluation: {e2}")
         
         # Calculate the time taken for this round
         end_time = time.time()
         round_time = end_time - start_time
         server.logger.info(f"Round time: {round_time:.2f} seconds")
-        
-        # Evaluate the global model explicitly on all test data
-        server.logger.info("Performing explicit evaluation on test dataset")
-        try:
-            # Create a temporary client to evaluate the global model
-            temp_client = client_fn("0")
-            test_accuracy, test_loss = temp_client.test(dataset_test)
-            server.logger.info(f"Explicit test evaluation: Accuracy={test_accuracy:.4f}, Loss={test_loss:.4f}")
-            
-            # Use this more reliable accuracy
-            accuracy = test_accuracy
-            loss = test_loss
-        except Exception as e:
-            server.logger.error(f"Error in explicit evaluation: {e}")
         
         # Save metrics
         server.save_metrics(active_learning_round, accuracy, loss, round_time)
@@ -191,6 +248,11 @@ def main():
         
         for cid in all_client_ids:
             client = client_fn(cid)
+            
+            # Ensure client has the latest global model
+            if hasattr(fl_strategy, "parameters_aggregated"):
+                client.set_parameters(fl_strategy.parameters_aggregated)
+                
             initial_labeled_size = len(client.labeled_indices)
             queried_indices = client.query_samples()
             

@@ -103,6 +103,8 @@ class FedAvgClient(fl.client.NumPyClient):
         
         for epoch in range(self.args.local_epochs):
             total_loss = 0.0
+            correct = 0
+            total = 0
             for batch_idx, (data, target, _) in enumerate(trainloader):
                 data, target = data.to(self.device), target.to(self.device)
                 
@@ -113,6 +115,15 @@ class FedAvgClient(fl.client.NumPyClient):
                 optimizer.step()
                 
                 total_loss += loss.item()
+                
+                # Calculate accuracy
+                _, predicted = output.max(1)
+                total += target.size(0)
+                correct += predicted.eq(target).sum().item()
+            
+            epoch_loss = total_loss / len(trainloader)
+            epoch_acc = 100. * correct / total
+            print(f"Client {self.cid} - Epoch {epoch+1}/{self.args.local_epochs} - Train Loss: {epoch_loss:.4f}, Acc: {epoch_acc:.2f}%")
     
     def train_local_only(self, indices):
         """Train local-only model on local dataset."""
@@ -163,7 +174,6 @@ class FedAvgClient(fl.client.NumPyClient):
         
         return accuracy, loss
     
-
     def query_samples(self):
         """Query samples from unlabeled data."""
         if len(self.unlabeled_indices) == 0:

@@ -45,8 +45,26 @@ class DatasetSplit(Dataset):
         image, label = self.dataset[self.idxs[item]]
         return image, label, self.idxs[item]  # Return index as well
 
-def dir_partition(dataset, num_clients, alpha):
-    """Partition the dataset using Dirichlet distribution."""
+def dir_partition(dataset, num_clients, alpha, equal_samples=True):
+    """
+    Partition the dataset using Dirichlet distribution.
+    
+    Args:
+        dataset: The dataset to partition
+        num_clients: Number of clients
+        alpha: Concentration parameter for Dirichlet distribution (lower means more heterogeneity)
+        equal_samples: If True, ensure each client gets approximately the same number of samples
+        
+    Returns:
+        Dictionary mapping client IDs to list of data indices
+    """
+    if equal_samples:
+        return dir_partition_balanced(dataset, num_clients, alpha)
+    else:
+        return dir_partition_original(dataset, num_clients, alpha)
+
+def dir_partition_original(dataset, num_clients, alpha):
+    """Original Dirichlet partitioning method (potentially unbalanced)."""
     num_classes = len(np.unique(np.array(dataset.targets)))
     client_data_dict = {i: [] for i in range(num_clients)}
     
@@ -81,17 +99,107 @@ def dir_partition(dataset, num_clients, alpha):
             )
             start_idx += int(num_samples)
     
-    # Ensure each client has the same amount of data
-    max_len = max([len(client_data_dict[i]) for i in range(num_clients)])
+    return client_data_dict
+
+def dir_partition_balanced(dataset, num_clients, alpha):
+    """
+    Balanced Dirichlet partitioning method that ensures each client gets approximately 
+    the same number of samples while maintaining class imbalance.
+    """
+    num_classes = len(np.unique(np.array(dataset.targets)))
+    client_data_dict = {i: [] for i in range(num_clients)}
+    
+    # Calculate target samples per client
+    total_samples = len(dataset)
+    target_samples_per_client = total_samples // num_clients
+    
+    print(f"Total dataset size: {total_samples}")
+    print(f"Target samples per client: {target_samples_per_client}")
+    
+    # Group indices by label
+    label_indices = {i: [] for i in range(num_classes)}
+    for idx, label in enumerate(dataset.targets):
+        if isinstance(label, torch.Tensor):
+            label = label.item()
+        label_indices[label].append(idx)
+    
+    # Print class distribution
+    for c in range(num_classes):
+        print(f"Class {c}: {len(label_indices[c])} samples")
+    
+    # Sample client proportions using Dirichlet distribution
+    proportions = np.random.dirichlet(alpha * np.ones(num_clients), num_classes)
+    
+    # First pass: distribute according to Dirichlet proportions
+    for class_idx, class_proportions in enumerate(proportions):
+        class_size = len(label_indices[class_idx])
+        
+        # Get the number of samples per client for this class
+        num_samples_per_client = np.round(class_proportions * class_size).astype(int)
+        # Adjust to ensure the sum matches the class size
+        num_samples_per_client[-1] = class_size - np.sum(num_samples_per_client[:-1])
+        
+        # Shuffle the indices for this class
+        class_indices = label_indices[class_idx].copy()
+        random.shuffle(class_indices)
+        
+        # Assign indices to clients
+        start_idx = 0
+        for client_idx, num_samples in enumerate(num_samples_per_client):
+            num_samples = int(num_samples)
+            if start_idx + num_samples <= len(class_indices):
+                client_data_dict[client_idx].extend(
+                    class_indices[start_idx:start_idx + num_samples]
+                )
+                start_idx += num_samples
+    
+    # Second pass: ensure each client has exactly target_samples_per_client samples
+    # First, check how many samples each client has
+    client_sample_counts = {i: len(samples) for i, samples in client_data_dict.items()}
+    
+    # For clients with too few samples, randomly sample from other clients or remaining data
+    remaining_indices = []
+    for c in range(num_classes):
+        remaining_indices.extend(label_indices[c])
+    
+    # First distribute from clients with excess samples
     for client_idx in range(num_clients):
-        current_len = len(client_data_dict[client_idx])
-        if current_len < max_len:
-            # Randomly sample additional data
-            additional_indices = random.sample(
-                sum([label_indices[c] for c in range(num_classes)], []),
-                max_len - current_len
-            )
-            client_data_dict[client_idx].extend(additional_indices)
+        if client_sample_counts[client_idx] > target_samples_per_client:
+            # This client has too many samples, remove some
+            excess = client_sample_counts[client_idx] - target_samples_per_client
+            excess_indices = random.sample(client_data_dict[client_idx], excess)
+            client_data_dict[client_idx] = [idx for idx in client_data_dict[client_idx] if idx not in excess_indices]
+            remaining_indices.extend(excess_indices)
+            client_sample_counts[client_idx] = target_samples_per_client
+    
+    # Remove indices that are already assigned to clients
+    for client_idx in range(num_clients):
+        for idx in client_data_dict[client_idx]:
+            if idx in remaining_indices:
+                remaining_indices.remove(idx)
+    
+    # Now add samples to clients with too few
+    for client_idx in range(num_clients):
+        if client_sample_counts[client_idx] < target_samples_per_client:
+            # This client needs more samples
+            needed = target_samples_per_client - client_sample_counts[client_idx]
+            if needed > 0:
+                additional_indices = random.sample(remaining_indices, min(needed, len(remaining_indices)))
+                client_data_dict[client_idx].extend(additional_indices)
+                for idx in additional_indices:
+                    remaining_indices.remove(idx)
+                client_sample_counts[client_idx] += len(additional_indices)
+    
+    # Print final distribution
+    print("\nFinal client data distribution:")
+    client_class_counts = {i: {c: 0 for c in range(num_classes)} for i in range(num_clients)}
+    
+    for client_idx, indices in client_data_dict.items():
+        for idx in indices:
+            label = dataset.targets[idx].item() if isinstance(dataset.targets[idx], torch.Tensor) else dataset.targets[idx]
+            client_class_counts[client_idx][label] += 1
+        
+        print(f"Client {client_idx}: {len(indices)} samples, class distribution: {client_class_counts[client_idx]}")
     
     return client_data_dict
 
