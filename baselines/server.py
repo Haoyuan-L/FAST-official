@@ -82,8 +82,15 @@ class FedAvgServer:
         }
         
         # Store labeled and unlabeled data indices for each client
-        self.client_labeled_dict = {}
-        self.client_unlabeled_dict = {}
+        self.client_labeled_dict = self.args.client_labeled_dict.copy() if hasattr(self.args, 'client_labeled_dict') else {}
+        self.client_unlabeled_dict = self.args.client_unlabeled_dict.copy() if hasattr(self.args, 'client_unlabeled_dict') else {}
+        
+        # Create global model for evaluation
+        self.global_model = self.args.get_model_fn().to(self.args.device)
+        
+        # Store best model
+        self.best_model = None
+        self.best_accuracy = 0.0
     
     def fit_config(self, server_round: int):
         """Return training configuration."""
@@ -103,6 +110,10 @@ class FedAvgServer:
         }
         return config
     
+    def weighted_average(self, metrics: List[Tuple[int, Dict[str, float]]]) -> Dict[str, float]:
+        """Compute weighted average of metrics."""
+        return weighted_average(metrics)
+    
     def get_fl_strategy(self):
         """Return the FL strategy."""
         if self.args.fl_strategy == 'fedavg':
@@ -114,26 +125,73 @@ class FedAvgServer:
                 min_available_clients=self.args.num_clients,  # Minimum number of available clients
                 on_fit_config_fn=self.fit_config,  # Function to configure training
                 on_evaluate_config_fn=self.evaluate_config,  # Function to configure evaluation
-                evaluate_metrics_aggregation_fn=weighted_average,  # Function to aggregate metrics
-                initial_parameters=None,  # Initial parameters
+                evaluate_metrics_aggregation_fn=self.weighted_average,  # Function to aggregate metrics
+                initial_parameters=self.get_initial_parameters(),  # Initial parameters
             )
         elif self.args.fl_strategy == 'fedprox':
-            # FedProx is similar to FedAvg but adds a proximal term
-            # Since Flower doesn't have a built-in FedProx, we use FedAvg
-            # and add the proximal term in the client's optimization
+            # Add configuration for FedProx
+            def fit_config_fedprox(server_round: int):
+                config = self.fit_config(server_round)
+                config["proximal_mu"] = self.args.mu  # Add proximal term coefficient
+                return config
+                
             return fl.server.strategy.FedAvg(
                 fraction_fit=1.0,
                 fraction_evaluate=1.0,
                 min_fit_clients=self.args.num_clients,
                 min_evaluate_clients=self.args.num_clients,
                 min_available_clients=self.args.num_clients,
-                on_fit_config_fn=self.fit_config,
+                on_fit_config_fn=fit_config_fedprox,
                 on_evaluate_config_fn=self.evaluate_config,
-                evaluate_metrics_aggregation_fn=weighted_average,
-                initial_parameters=None,
+                evaluate_metrics_aggregation_fn=self.weighted_average,
+                initial_parameters=self.get_initial_parameters(),
             )
         else:
             raise ValueError(f"Unsupported FL strategy: {self.args.fl_strategy}")
+    
+    def get_initial_parameters(self):
+        """Get initial model parameters."""
+        # Initialize the model
+        model = self.args.get_model_fn().to(self.args.device)
+        parameters = [val.cpu().numpy() for _, val in model.state_dict().items()]
+        return fl.common.ndarrays_to_parameters(parameters)
+    
+    def set_model_parameters(self, parameters):
+        """Set parameters to the global model."""
+        params_dict = zip(self.global_model.state_dict().keys(), parameters)
+        state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+        self.global_model.load_state_dict(state_dict, strict=True)
+    
+    def evaluate_global_model(self, dataset):
+        """Evaluate the global model on the given dataset."""
+        self.global_model.eval()
+        test_loader = torch.utils.data.DataLoader(
+            dataset, 
+            batch_size=self.args.test_batch_size, 
+            shuffle=False
+        )
+        
+        loss = 0
+        correct = 0
+        with torch.no_grad():
+            for data, target in test_loader:
+                data, target = data.to(self.args.device), target.to(self.args.device)
+                output, _ = self.global_model(data)
+                loss += torch.nn.functional.cross_entropy(output, target, reduction='sum').item()
+                pred = output.argmax(dim=1, keepdim=True)
+                correct += pred.eq(target.view_as(pred)).sum().item()
+        
+        accuracy = correct / len(test_loader.dataset)
+        loss /= len(test_loader.dataset)
+        
+        # Save best model if needed
+        if accuracy > self.best_accuracy:
+            self.best_accuracy = accuracy
+            self.best_model = self.global_model.state_dict()
+            torch.save(self.best_model, f"{self.result_dir}/best_model.pt")
+            self.logger.info(f"New best model saved with accuracy: {accuracy:.4f}")
+        
+        return accuracy, loss
     
     def save_metrics(self, round_num, accuracy, loss, round_time=None, client_data=None):
         """Save metrics for the current round."""

@@ -29,12 +29,13 @@ class FedAvgClient(fl.client.NumPyClient):
         self.model = args.get_model_fn().to(self.device)
         self.local_model = copy.deepcopy(self.model)  # Local-only model for active learning
         
-        # Keep best model
-        self.best_model = None
-        self.best_acc = 0.0
+        # Training history
+        self.train_history = {"loss": [], "accuracy": []}
         
         # Active learning strategy
         self.al_strategy = get_al_strategy(args.al_method)
+        
+        print(f"Client {self.cid} initialized with {len(self.labeled_indices)} labeled and {len(self.unlabeled_indices)} unlabeled samples")
     
     def get_parameters(self, config):
         """Return model parameters as a list of NumPy arrays."""
@@ -45,6 +46,9 @@ class FedAvgClient(fl.client.NumPyClient):
         params_dict = zip(self.model.state_dict().keys(), parameters)
         state_dict = {k: torch.tensor(v) for k, v in params_dict}
         self.model.load_state_dict(state_dict, strict=True)
+        
+        # When we update the global model, also initialize the local model from it
+        self.local_model = copy.deepcopy(self.model)
     
     def fit(self, parameters, config):
         """Train model on local dataset."""
@@ -57,17 +61,16 @@ class FedAvgClient(fl.client.NumPyClient):
             return self.get_parameters(config={}), 0, {}
         
         # Train the model
-        self.train(self.labeled_indices)
+        train_stats = self.train(self.labeled_indices)
         
         # Train local-only model if it's needed for active learning
         if self.args.query_model_mode in ["local_only", "both"]:
-            # Make a deep copy to avoid affecting the global model
-            self.local_model = copy.deepcopy(self.model)
-            # Train local-only model
-            self.train_local_only(self.labeled_indices)
+            # Already copied the model in set_parameters
+            # Train local-only model with more aggressive local updates
+            local_stats = self.train_local_only(self.labeled_indices)
         
         # Return updated model parameters and statistics
-        return self.get_parameters(config={}), len(self.labeled_indices), {}
+        return self.get_parameters(config={}), len(self.labeled_indices), train_stats
 
     def evaluate(self, parameters, config):
         """Evaluate model on local test dataset."""
@@ -77,18 +80,13 @@ class FedAvgClient(fl.client.NumPyClient):
         # Evaluate the model
         acc, loss = self.test(self.dataset_test)
         
-        # Store best model
-        if acc > self.best_acc:
-            self.best_acc = acc
-            self.best_model = copy.deepcopy(self.model.state_dict())
-        
         # Return statistics
         return float(loss), len(self.dataset_test), {"accuracy": float(acc)}
     
     def train(self, indices):
         """Train model on local dataset."""
         if not indices:
-            return  # Skip training if no labeled data
+            return {"loss": 0.0, "accuracy": 0.0}
             
         self.model.train()
         optimizer = torch.optim.SGD(
@@ -100,6 +98,9 @@ class FedAvgClient(fl.client.NumPyClient):
         
         train_dataset = DatasetSplit(self.dataset_train, indices)
         trainloader = DataLoader(train_dataset, batch_size=self.args.batch_size, shuffle=True)
+        
+        epoch_losses = []
+        epoch_accs = []
         
         for epoch in range(self.args.local_epochs):
             total_loss = 0.0
@@ -123,12 +124,21 @@ class FedAvgClient(fl.client.NumPyClient):
             
             epoch_loss = total_loss / len(trainloader)
             epoch_acc = 100. * correct / total
+            epoch_losses.append(epoch_loss)
+            epoch_accs.append(epoch_acc / 100.0)  # Store as decimal
+            
             print(f"Client {self.cid} - Epoch {epoch+1}/{self.args.local_epochs} - Train Loss: {epoch_loss:.4f}, Acc: {epoch_acc:.2f}%")
+        
+        # Store training history
+        self.train_history["loss"].extend(epoch_losses)
+        self.train_history["accuracy"].extend(epoch_accs)
+        
+        return {"loss": epoch_losses[-1], "accuracy": epoch_accs[-1]}
     
     def train_local_only(self, indices):
         """Train local-only model on local dataset."""
         if not indices:
-            return  # Skip training if no labeled data
+            return {"loss": 0.0, "accuracy": 0.0}
             
         self.local_model.train()
         optimizer = torch.optim.SGD(
@@ -141,8 +151,16 @@ class FedAvgClient(fl.client.NumPyClient):
         train_dataset = DatasetSplit(self.dataset_train, indices)
         trainloader = DataLoader(train_dataset, batch_size=self.args.batch_size, shuffle=True)
         
-        for epoch in range(self.args.local_epochs):
+        epoch_losses = []
+        epoch_accs = []
+        
+        # Train for more epochs locally to increase divergence for LoGo
+        local_epochs = self.args.local_epochs * 2  # Double the local epochs
+        
+        for epoch in range(local_epochs):
             total_loss = 0.0
+            correct = 0
+            total = 0
             for batch_idx, (data, target, _) in enumerate(trainloader):
                 data, target = data.to(self.device), target.to(self.device)
                 
@@ -153,6 +171,21 @@ class FedAvgClient(fl.client.NumPyClient):
                 optimizer.step()
                 
                 total_loss += loss.item()
+                
+                # Calculate accuracy
+                _, predicted = output.max(1)
+                total += target.size(0)
+                correct += predicted.eq(target).sum().item()
+            
+            epoch_loss = total_loss / len(trainloader)
+            epoch_acc = 100. * correct / total
+            epoch_losses.append(epoch_loss)
+            epoch_accs.append(epoch_acc / 100.0)  # Store as decimal
+            
+            if epoch % 5 == 0:  # Print only every 5 epochs to reduce output
+                print(f"Client {self.cid} - Local Model - Epoch {epoch+1}/{local_epochs} - Loss: {epoch_loss:.4f}, Acc: {epoch_acc:.2f}%")
+        
+        return {"loss": epoch_losses[-1], "accuracy": epoch_accs[-1]}
     
     def test(self, dataset):
         """Test model on dataset."""

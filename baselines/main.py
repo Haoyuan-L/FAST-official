@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import flwr as fl
 from collections import OrderedDict
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import random
 import time
 
@@ -18,6 +18,42 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Federated Active Learning with LoGo')
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to configuration file')
     return parser.parse_args()
+
+class GlobalModelKeeper:
+    """Class to keep track of the global model between AL rounds"""
+    def __init__(self, model_fn):
+        self.model = model_fn()
+        self.parameters = None
+    
+    def update_parameters(self, parameters):
+        """Update model with new parameters"""
+        params_dict = zip(self.model.state_dict().keys(), parameters)
+        state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+        self.model.load_state_dict(state_dict, strict=True)
+        self.parameters = parameters
+    
+    def get_parameters(self):
+        """Get current model parameters"""
+        if self.parameters is None:
+            self.parameters = [val.cpu().numpy() for _, val in self.model.state_dict().items()]
+        return self.parameters
+
+class CustomFedAvgStrategy(fl.server.strategy.FedAvg):
+    """Custom FedAvg strategy that provides access to aggregated parameters"""
+    def __init__(self, global_model_keeper, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.global_model_keeper = global_model_keeper
+        
+    def aggregate_fit(self, *args, **kwargs):
+        """Aggregate parameters and update the global model keeper"""
+        result = super().aggregate_fit(*args, **kwargs)
+        if result is not None:
+            parameters_aggregated, _ = result
+            # Extract parameters from FedAvg result
+            numpy_params = fl.common.parameters_to_ndarrays(parameters_aggregated)
+            # Update the global model keeper
+            self.global_model_keeper.update_parameters(numpy_params)
+        return result
 
 def main():
     # Parse command-line arguments
@@ -93,8 +129,8 @@ def main():
     # Initialize server
     server = FedAvgServer(args_dict)
     
-    # Create global model for evaluation
-    global_model = args_dict.get_model_fn()
+    # Create global model keeper to preserve model state between rounds
+    global_model_keeper = GlobalModelKeeper(args_dict.get_model_fn)
     
     # Define client function
     def client_fn(cid):
@@ -115,9 +151,6 @@ def main():
             args=args_dict
         )
     
-    # Start Flower simulation
-    fl_strategy = server.get_fl_strategy()
-    
     # Run active learning process
     current_ratio = args_dict.initial_budget
     active_learning_round = 0
@@ -132,6 +165,20 @@ def main():
         # Start timer for this round
         start_time = time.time()
         
+        # Configure strategy with current global model
+        fl_strategy = CustomFedAvgStrategy(
+            global_model_keeper=global_model_keeper,
+            fraction_fit=1.0,
+            fraction_evaluate=1.0,
+            min_fit_clients=args_dict.num_clients,
+            min_evaluate_clients=args_dict.num_clients,
+            min_available_clients=args_dict.num_clients,
+            on_fit_config_fn=server.fit_config,
+            on_evaluate_config_fn=server.evaluate_config,
+            evaluate_metrics_aggregation_fn=server.weighted_average,
+            initial_parameters=fl.common.ndarrays_to_parameters(global_model_keeper.get_parameters()),
+        )
+        
         # Run federated learning for multiple rounds
         server.logger.info(f"Starting federated training for {args_dict.num_rounds} rounds")
         history = fl.simulation.start_simulation(
@@ -142,97 +189,48 @@ def main():
             client_resources={"num_cpus": 2, "num_gpus": 0.2},
         )
         
-        # Get evaluation metrics from the training
-        accuracy = 0.0
-        loss = 0.0
-        
-        # Try to extract from distributed metrics first
+        # Extract training metrics
         try:
             if history.metrics_distributed and 'accuracy' in history.metrics_distributed:
-                # Get the last round accuracy
                 acc_values = history.metrics_distributed['accuracy']
                 if acc_values and len(acc_values) > 0:
-                    # Extract the accuracy value from the last tuple (round_num, accuracy)
                     training_accuracy = acc_values[-1][1]
-                    server.logger.info(f"Extracted training accuracy from distributed metrics: {training_accuracy:.4f}")
+                    server.logger.info(f"Training accuracy from distributed metrics: {training_accuracy:.4f}")
         except Exception as e:
             server.logger.error(f"Error extracting distributed accuracy: {e}")
         
-        # Get final global model parameters from the server
-        try:
-            # Access parameters from the FL strategy
-            if hasattr(fl_strategy, 'parameters'):
-                global_params = fl_strategy.parameters
-                
-                # Update the global model with the final parameters
-                global_state_dict = OrderedDict(
-                    zip(global_model.state_dict().keys(), 
-                        [torch.tensor(v) for v in global_params])
-                )
-                global_model.load_state_dict(global_state_dict, strict=True)
-                
-                # Move model to correct device
-                global_model.to(args_dict.device)
-                
-                # Evaluate the global model directly
-                global_model.eval()
-                test_loader = torch.utils.data.DataLoader(
-                    dataset_test, 
-                    batch_size=args_dict.test_batch_size, 
-                    shuffle=False
-                )
-                
-                correct = 0
-                total_loss = 0
-                with torch.no_grad():
-                    for data, target in test_loader:
-                        data, target = data.to(args_dict.device), target.to(args_dict.device)
-                        output, _ = global_model(data)
-                        loss = torch.nn.functional.cross_entropy(output, target, reduction='sum').item()
-                        total_loss += loss
-                        pred = output.argmax(dim=1, keepdim=True)
-                        correct += pred.eq(target.view_as(pred)).sum().item()
-                
-                test_loss = total_loss / len(test_loader.dataset)
-                test_accuracy = correct / len(test_loader.dataset)
-                
-                server.logger.info(f"Direct global model evaluation: Accuracy={test_accuracy:.4f}, Loss={test_loss:.4f}")
-                
-                # Use this as our official accuracy and loss
-                accuracy = test_accuracy
-                loss = test_loss
-            else:
-                server.logger.error("FL strategy does not have parameters attribute")
-                
-                # Fallback to client evaluation
-                temp_client = client_fn("0")
-                # Make sure the client has the latest global model parameters
-                if hasattr(fl_strategy, "parameters_aggregated"):
-                    temp_client.set_parameters(fl_strategy.parameters_aggregated)
-                test_accuracy, test_loss = temp_client.test(dataset_test)
-                
-                server.logger.info(f"Fallback client evaluation: Accuracy={test_accuracy:.4f}, Loss={test_loss:.4f}")
-                accuracy = test_accuracy
-                loss = test_loss
-                
-        except Exception as e:
-            server.logger.error(f"Error in global model evaluation: {e}")
-            
-            # Try the old evaluation method as fallback
-            try:
-                # Create a temporary client to evaluate the global model
-                temp_client = client_fn("0")
-                # Ensure we set the parameters from the latest round
-                if hasattr(fl_strategy, "parameters_aggregated"):
-                    temp_client.set_parameters(fl_strategy.parameters_aggregated)
-                test_accuracy, test_loss = temp_client.test(dataset_test)
-                server.logger.info(f"Fallback test evaluation: Accuracy={test_accuracy:.4f}, Loss={test_loss:.4f}")
-                
-                # Use this more reliable accuracy
-                accuracy = test_accuracy
-                loss = test_loss
-            except Exception as e2:
-                server.logger.error(f"Error in fallback evaluation: {e2}")
+        # Evaluate the global model
+        global_model = args_dict.get_model_fn().to(args_dict.device)
+        global_params = global_model_keeper.get_parameters()
+        
+        # Set parameters for the global model
+        params_dict = zip(global_model.state_dict().keys(), global_params)
+        state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+        global_model.load_state_dict(state_dict, strict=True)
+        
+        # Evaluate the global model
+        global_model.eval()
+        test_loader = torch.utils.data.DataLoader(
+            dataset_test, 
+            batch_size=args_dict.test_batch_size, 
+            shuffle=False
+        )
+        
+        correct = 0
+        total_loss = 0
+        with torch.no_grad():
+            for data, target in test_loader:
+                data, target = data.to(args_dict.device), target.to(args_dict.device)
+                output, _ = global_model(data)
+                loss = torch.nn.functional.cross_entropy(output, target, reduction='sum').item()
+                total_loss += loss
+                pred = output.argmax(dim=1, keepdim=True)
+                correct += pred.eq(target.view_as(pred)).sum().item()
+        
+        test_loss = total_loss / len(test_loader.dataset)
+        test_accuracy = correct / len(test_loader.dataset)
+        
+        server.logger.info(f"Global model evaluation: Accuracy={test_accuracy:.4f}, Loss={test_loss:.4f}")
         
         # Calculate the time taken for this round
         end_time = time.time()
@@ -240,7 +238,7 @@ def main():
         server.logger.info(f"Round time: {round_time:.2f} seconds")
         
         # Save metrics
-        server.save_metrics(active_learning_round, accuracy, loss, round_time)
+        server.save_metrics(active_learning_round, test_accuracy, test_loss, round_time)
         
         # Query new samples for each client
         client_data = {}
@@ -248,11 +246,9 @@ def main():
         
         for cid in all_client_ids:
             client = client_fn(cid)
+            # Set the global model parameters for active learning
+            client.set_parameters(global_model_keeper.get_parameters())
             
-            # Ensure client has the latest global model
-            if hasattr(fl_strategy, "parameters_aggregated"):
-                client.set_parameters(fl_strategy.parameters_aggregated)
-                
             initial_labeled_size = len(client.labeled_indices)
             queried_indices = client.query_samples()
             
@@ -280,11 +276,11 @@ def main():
         current_ratio += args_dict.query_budget
     
     server.logger.info("\nFederated Active Learning completed!")
-    server.logger.info(f"Final test accuracy: {accuracy:.4f}")
+    server.logger.info(f"Final test accuracy: {test_accuracy:.4f}")
     server.logger.info(f"Results saved to {server.result_dir}")
     
     print("\nFederated Active Learning completed!")
-    print(f"Final test accuracy: {accuracy:.4f}")
+    print(f"Final test accuracy: {test_accuracy:.4f}")
     print(f"Results saved to {server.result_dir}")
 
 if __name__ == "__main__":
