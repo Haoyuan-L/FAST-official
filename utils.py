@@ -319,3 +319,40 @@ class CustomTensorDataset(Dataset):
 
     def __len__(self):
         return len(self.data)
+
+def calculate_size_bytes(parameters):
+    """Calculate the size of parameters in bytes."""
+    total_bytes = 0
+    for param in parameters:
+        # Get bytes per element based on dtype
+        bytes_per_element = param.itemsize
+        # Calculate total bytes for this parameter
+        param_bytes = param.size * bytes_per_element
+        total_bytes += param_bytes
+    return total_bytes
+
+def format_size(size_bytes):
+    """Format bytes to human-readable format."""
+    if size_bytes < 1024:
+        return f"{size_bytes} bytes"
+    elif size_bytes < 1024**2:
+        return f"{size_bytes/1024:.2f} KB"
+    elif size_bytes < 1024**3:
+        return f"{size_bytes/(1024**2):.2f} MB"
+    else:
+        return f"{size_bytes/(1024**3):.2f} GB"
+
+def format_time(seconds):
+    """Format seconds into a readable time format."""
+    if seconds < 60:
+        return f"{seconds:.2f} seconds"
+    elif seconds < 3600:
+        minutes = seconds // 60
+        seconds %= 60
+        return f"{int(minutes)}m {seconds:.2f}s"
+    else:
+        hours = seconds // 3600
+        seconds %= 3600
+        minutes = seconds // 60
+        seconds %= 60
+        return f"{int(hours)}h {int(minutes)}m {seconds:.2f}s"

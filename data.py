@@ -14,6 +14,7 @@ import faiss
 from collections import Counter
 import time
 from scipy.stats import mode
+import logging
 
 def get_transforms(dataset_name, augmentation=True):
     """Returns the appropriate transformations based on the dataset name."""
@@ -110,6 +111,9 @@ def compute_largest_margin(logits):
     return uncertainty
 
 def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_path=None):
+    # Start timing
+    embedding_start_time = time.time()
+
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     all_embeddings = []
     all_labels = []
@@ -128,11 +132,22 @@ def get_embeddings(dataset, model, device, fname, lname, batch_size=64, save_pat
     all_labels = torch.cat(all_labels)
     all_labels = all_labels.cpu().numpy()
 
+    # Calculate embedding time
+    embedding_time = time.time() - embedding_start_time
+
+    # Log the embedding time
+    logging.info(f"Embedding generation for {fname} took {embedding_time:.2f} seconds")
+
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         torch.save(all_embeddings, save_path+fname)
         torch.save(all_labels, save_path+lname)
-    return all_embeddings, all_labels
+
+        # Also save the timing information
+        embedding_time_info = {"embedding_time": embedding_time}
+        torch.save(embedding_time_info, save_path+fname.replace(".pt", "_time.pt"))
+
+    return all_embeddings, all_labels, embedding_time  # Return the timing information
 
 def get_labels_from_knn(k, indices, labeled_labels, num_classes):
     logits = []
@@ -282,6 +297,16 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
              split=None, alpha=None, num_workers=4, seed=0, data_dir="./data", class_aware=False, uncertainty="norm", active_oracle=True, 
              budget=0.1, initial_only=False, initial_with_random=False):
 
+    # Configure logging
+    logging.basicConfig(
+        filename=f"{dataset_name}_{encoder}_embedding_times.log",
+        level=logging.INFO,
+        format='%(asctime)s - %(message)s'
+    )
+
+    # Start timing the entire process
+    total_start_time = time.time()
+
     # load the OpenCLIP model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if encoder == "SigLIP":
@@ -348,7 +373,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         with contextlib.redirect_stdout(None):
             train_dataset = CIFAR100(root=data_dir, train=True, download=True, transform=get_transforms(dataset_name, augmentation=True))
             train_dataset_for_embeddings = CIFAR100(root=data_dir, train=True, download=True, transform=preprocess)
-            test_dataset = CIFAR100(root=data_dir, train=False, download=True, transform=get_transforms(dataset_name, augmentation=False))
+            test_dataset = CIFAR100(root=data_dir, train=False, download=True,ransform=get_transforms(dataset_name, augmentation=False))
             test_dataset_for_embeddings = CIFAR100(root=data_dir, train=False, download=True, transform=preprocess)
         num_classes = 100
     
@@ -372,7 +397,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         all_labels = np.load(f"{dataset_name}_None_labels.npy")
     else:
         # balancely select 1% of the data as the initial labeled training set, and the rest as the unlabeled pool
-        initial_labeled_ratio = 0.01
+        initial_labeled_ratio = 0.05
         np.random.seed(seed)
         total_samples = len(train_dataset)
         num_labeled_samples = int(total_samples * initial_labeled_ratio)
@@ -414,10 +439,26 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         if os.path.exists(os.path.join(save_path, train_embeddings_fname)):
             train_embeddings = torch.load(os.path.join(save_path, train_embeddings_fname))
             train_labels = torch.load(os.path.join(save_path, train_labels_fname))
+            # Try to load the timing information if it exists
+            try:
+                time_info = torch.load(os.path.join(save_path, train_embeddings_fname.replace(".pt", "_time.pt")))
+                train_embedding_time = time_info.get("embedding_time", "Unknown")
+                logging.info(f"Loaded existing embeddings for {dataset_name} (train). Original embedding time: {train_embedding_time}")
+            except:
+                logging.info(f"Loaded existing embeddings for {dataset_name} (train). Timing information not available.")
         else:
-            train_embeddings, train_labels = get_embeddings(
-                train_dataset_for_embeddings, model, device, fname=train_embeddings_fname, lname=train_labels_fname, batch_size=batch_size, save_path=save_path
+            # Measure the time for generating train embeddings
+            train_embedding_start = time.time()
+            logging.info(f"Starting to generate embeddings for {dataset_name} (train)...")
+            train_embeddings, train_labels, train_embedding_time = get_embeddings(
+                train_dataset_for_embeddings, model, device, 
+                fname=train_embeddings_fname, 
+                lname=train_labels_fname, 
+                batch_size=batch_size, 
+                save_path=save_path
             )
+            logging.info(f"Finished generating embeddings for {dataset_name} (train) in {train_embedding_time:.2f} seconds")
+
 
         # Extract and save embeddings for initial data
         if not os.path.exists(f"{dataset_name}_initial_embeddings.pt"):
@@ -435,12 +476,16 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         unlabeled_ground_truth = train_labels[unlabeled_indices]
 
         # Apply FAISS-KNN to embeddings for data labeling
+        faiss_start_time = time.time()
+        logging.info(f"Starting FAISS-KNN processing for {dataset_name}...")
         labeled_embeddings_np = labeled_embeddings.numpy().astype('float32')
         unlabeled_embeddings_np = unlabeled_embeddings.numpy().astype('float32')
         index = faiss.IndexFlatL2(labeled_embeddings_np.shape[1])
         index.add(labeled_embeddings_np)
         k = 10
         distances, indices = index.search(unlabeled_embeddings_np, k)
+        faiss_time = time.time() - faiss_start_time
+        logging.info(f"FAISS-KNN processing completed in {faiss_time:.2f} seconds")
 
         # Get the pseudo-labels for the unlabeled data via majority voting
         # label_frac = get_labels_from_knn(k, indices, labeled_labels, num_classes)
@@ -555,7 +600,7 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
                     oracle_annotation_labels = unlabeled_ground_truth[uncertain_indices]
                     all_labels[uncertain_sample_indices] = oracle_annotation_labels
 
-            # Save the updated labels
+            #Save the updated labels
             np.save(f"{dataset_name}_{uncertainty}_balance-{class_aware}_budget{budget}_labels.npy", all_labels)
 
             # Labeling accuracy after the active learning round
@@ -574,21 +619,30 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
         # Filenames for test embeddings and labels
         test_embeddings_fname = f"{dataset_name}_embeddings_test.pt"
         test_labels_fname = f"{dataset_name}_test_labels.pt"
-        
+
         # Check if test embeddings already exist
         if os.path.exists(os.path.join(save_path, test_embeddings_fname)):
             test_embeddings = torch.load(os.path.join(save_path, test_embeddings_fname))
             test_labels = torch.load(os.path.join(save_path, test_labels_fname))
+            # Try to load the timing information if it exists
+            try:
+                time_info = torch.load(os.path.join(save_path, test_embeddings_fname.replace(".pt", "_time.pt")))
+                test_embedding_time = time_info.get("embedding_time", "Unknown")
+                logging.info(f"Loaded existing embeddings for {dataset_name} (test). Original embedding time: {test_embedding_time}")
+            except:
+                logging.info(f"Loaded existing embeddings for {dataset_name} (test). Timing information not available.")
         else:
             # Create a subset of the test_dataset to encode all test samples
             test_subset = torch.utils.data.Subset(test_dataset_for_embeddings, list(range(len(test_dataset_for_embeddings))))
-            test_embeddings, test_labels = get_embeddings(
+            logging.info(f"Starting to generate embeddings for {dataset_name} (test)...")
+            test_embeddings, test_labels, test_embedding_time = get_embeddings(
                 test_subset, model, device, 
                 fname=test_embeddings_fname, 
                 lname=test_labels_fname, 
                 batch_size=batch_size, 
                 save_path=save_path
             )
+            logging.info(f"Finished generating embeddings for {dataset_name} (test) in {test_embedding_time:.2f} seconds")
         test_labels = torch.from_numpy(test_labels).long()
 
     if initial_only:
@@ -657,5 +711,8 @@ def get_data(dataset_name="cifar10", id=0, num_clients=10, return_eval_ds=False,
             train_dataset = torch.utils.data.Subset(train_dataset, train_indices)
             train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
             num_samples = len(train_indices)
+
+        total_time = time.time() - total_start_time
+        logging.info(f"Total data processing time for {dataset_name}: {total_time:.2f} seconds")
 
         return train_loader, num_classes, num_samples, data_ratio

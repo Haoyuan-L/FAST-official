@@ -1,26 +1,38 @@
 experiments:
-  - dataset: "cifar10"
-    num_rounds: 100
-    num_clients: 10
-    data_split: "iid"
-    participation: 1.0
-    max_parallel_executions: 5
-    skewness_alpha: 0.1
-    seed: 1
-    class_aware: True
-    uncertainty: "None"
-    model: "linear"
-    active_oracle: False
+#  - dataset: "cifar10"
+#    num_rounds: 100
+#    local_epochs: 5
+#    num_clients: 10
+#    data_split: "iid"
+#    participation: 1.0
+#    max_parallel_executions: 5
+#    skewness_alpha: 0.1
+#    seed: 0
+#    class_aware: False
+#    uncertainty: "norm"
+#    model: "cnn4"
+#    active_oracle: True
+#    encoder: "SigLIP"
+#    budget: 0.2
+#    fl_method: "fedavg"
+#    initial_only: False
+#    initial_with_random: False
 
-  - dataset: "cifar10"
-    num_rounds: 100
+  - dataset: "pathmnist"
+    num_rounds: 150
+    local_epochs: 5
     num_clients: 10
     data_split: "iid"
     participation: 1.0
     max_parallel_executions: 5
     skewness_alpha: 0.1
-    seed: 1
-    class_aware: True
+    seed: 0
+    class_aware: False
     uncertainty: "norm"
-    model: "linear"   
+    model: "cnn4"
     active_oracle: True
+    encoder: "SigLIP"
+    budget: 0.2
+    fl_method: "fedavg"
+    initial_only: False
+    initial_with_random: False

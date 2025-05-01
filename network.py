@@ -191,7 +191,6 @@ class LinearProbe(nn.Module):
     def __init__(self, embedding_dim, num_classes):
         super(LinearProbe, self).__init__()
         self.fc = nn.Linear(embedding_dim, num_classes)
-        self.fc.bias.data.fill_(0)
 
     def forward(self, x):
         return self.fc(x)
