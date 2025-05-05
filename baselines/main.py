@@ -38,6 +38,7 @@ class GlobalModelKeeper:
             self.parameters = [val.cpu().numpy() for _, val in self.model.state_dict().items()]
         return self.parameters
 
+
 class CustomFedAvgStrategy(fl.server.strategy.FedAvg):
     """Custom FedAvg strategy that provides access to aggregated parameters"""
     def __init__(self, global_model_keeper, *args, **kwargs):
@@ -46,14 +47,28 @@ class CustomFedAvgStrategy(fl.server.strategy.FedAvg):
         
     def aggregate_fit(self, *args, **kwargs):
         """Aggregate parameters and update the global model keeper"""
-        result = super().aggregate_fit(*args, **kwargs)
-        if result is not None:
-            parameters_aggregated, _ = result
-            # Extract parameters from FedAvg result
-            numpy_params = fl.common.parameters_to_ndarrays(parameters_aggregated)
-            # Update the global model keeper
-            self.global_model_keeper.update_parameters(numpy_params)
-        return result
+        try:
+            result = super().aggregate_fit(*args, **kwargs)
+            if result is not None:
+                parameters_aggregated, metrics_aggregated = result
+                if parameters_aggregated is not None:
+                    # Extract parameters from FedAvg result
+                    numpy_params = fl.common.parameters_to_ndarrays(parameters_aggregated)
+                    # Update the global model keeper
+                    self.global_model_keeper.update_parameters(numpy_params)
+                    return parameters_aggregated, metrics_aggregated
+                else:
+                    print("Warning: No parameters were aggregated (parameters_aggregated is None)")
+                    # Return the last known parameters to avoid errors
+                    return fl.common.ndarrays_to_parameters(self.global_model_keeper.get_parameters()), metrics_aggregated
+            else:
+                print("Warning: Aggregation result is None")
+                # Return the last known parameters to avoid errors
+                return fl.common.ndarrays_to_parameters(self.global_model_keeper.get_parameters()), {}
+        except Exception as e:
+            print(f"Error in aggregate_fit: {e}")
+            # Return the last known parameters to avoid errors
+            return fl.common.ndarrays_to_parameters(self.global_model_keeper.get_parameters()), {}
 
 def main():
     # Parse command-line arguments
@@ -78,12 +93,11 @@ def main():
     dataset_train, dataset_query, dataset_test = get_dataset(args_dict)
     
     # Partition dataset among clients
-    if args_dict.partition == 'dir':
+    if args_dict.partition == 'noniid':
         # Use Dirichlet distribution for non-IID data
-        client_data_dict = dir_partition(dataset_train, args_dict.num_clients, args_dict.alpha, equal_samples=True)
-    elif args_dict.partition == 'shard':
-        # Use shard partitioning for non-IID data
-        client_data_dict = shard_partition(dataset_train, args_dict.num_clients, args_dict.num_classes_per_user)
+        client_data_dict = dir_partition(dataset=dataset_train, num_clients=args_dict.num_clients, alpha=args_dict.alpha, dir=True)
+    elif args_dict.partition == 'iid':
+        client_data_dict = dir_partition(dataset=dataset_train, num_clients=args_dict.num_clients, seed=args_dict.seed)
     else:
         raise ValueError(f"Unsupported partition method: {args_dict.partition}")
     
@@ -208,6 +222,7 @@ def main():
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
         global_model.load_state_dict(state_dict, strict=True)
         
+
         # Evaluate the global model
         global_model.eval()
         test_loader = torch.utils.data.DataLoader(
@@ -215,21 +230,26 @@ def main():
             batch_size=args_dict.test_batch_size, 
             shuffle=False
         )
-        
+
         correct = 0
         total_loss = 0
         with torch.no_grad():
             for data, target in test_loader:
                 data, target = data.to(args_dict.device), target.to(args_dict.device)
+                
+                # Fix for multi-dimensional target tensors (e.g., PathMNIST)
+                if len(target.shape) > 1:
+                    target = target.squeeze()
+                
                 output, _ = global_model(data)
                 loss = torch.nn.functional.cross_entropy(output, target, reduction='sum').item()
                 total_loss += loss
                 pred = output.argmax(dim=1, keepdim=True)
                 correct += pred.eq(target.view_as(pred)).sum().item()
-        
+
         test_loss = total_loss / len(test_loader.dataset)
         test_accuracy = correct / len(test_loader.dataset)
-        
+
         server.logger.info(f"Global model evaluation: Accuracy={test_accuracy:.4f}, Loss={test_loss:.4f}")
         
         # Calculate the time taken for this round

@@ -109,6 +109,10 @@ class FedAvgClient(fl.client.NumPyClient):
             for batch_idx, (data, target, _) in enumerate(trainloader):
                 data, target = data.to(self.device), target.to(self.device)
                 
+                # Ensure target is the correct shape for loss calculation
+                if len(target.shape) > 1 and target.shape[1] == 1:
+                    target = target.squeeze(-1)
+                
                 optimizer.zero_grad()
                 output, _ = self.model(data)
                 loss = F.cross_entropy(output, target)
@@ -134,7 +138,8 @@ class FedAvgClient(fl.client.NumPyClient):
         self.train_history["accuracy"].extend(epoch_accs)
         
         return {"loss": epoch_losses[-1], "accuracy": epoch_accs[-1]}
-    
+
+
     def train_local_only(self, indices):
         """Train local-only model on local dataset."""
         if not indices:
@@ -163,6 +168,10 @@ class FedAvgClient(fl.client.NumPyClient):
             total = 0
             for batch_idx, (data, target, _) in enumerate(trainloader):
                 data, target = data.to(self.device), target.to(self.device)
+                
+                # Ensure target is the correct shape for loss calculation
+                if len(target.shape) > 1 and target.shape[1] == 1:
+                    target = target.squeeze(-1)
                 
                 optimizer.zero_grad()
                 output, _ = self.local_model(data)
@@ -197,6 +206,11 @@ class FedAvgClient(fl.client.NumPyClient):
         with torch.no_grad():
             for data, target in test_loader:
                 data, target = data.to(self.device), target.to(self.device)
+                
+                # Ensure target is the correct shape for loss calculation
+                if len(target.shape) > 1 and target.shape[1] == 1:
+                    target = target.squeeze(-1)
+                
                 output, _ = self.model(data)
                 loss += F.cross_entropy(output, target, reduction='sum').item()
                 pred = output.argmax(dim=1, keepdim=True)

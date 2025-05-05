@@ -3,11 +3,11 @@ seed: 42
 device: 'cuda:0'  # 'cuda:0' or 'cpu'
 
 # Dataset configuration
-dataset: 'cifar10'  # Options: 'cifar10', 'svhn', 'pathmnist', 'dermamnist', 'organamnist'
+dataset: 'cifar10'  # Options: 'cifar10', 'svhn', 'cifar100'
 data_dir: './data'
-partition: 'dir'    # Options: 'dir' (Dirichlet) or 'shard'
+partition: 'noniid'
 alpha: 0.1         # Concentration parameter for Dirichlet distribution (lower means more heterogeneity)
-num_classes_per_user: 2  # For shard partition
+#num_classes_per_user: 2  # For shard partition
 
 # Active learning configuration
 initial_budget: 0.05  # Initial labeling budget as a fraction of total data
@@ -29,7 +29,7 @@ fl_strategy: 'fedavg'  # Options: 'fedavg', 'fedprox'
 mu: 0.01  # For FedProx
 
 # Model configuration
-model: 'cnn4conv'  # Options: 'cnn4conv', 'resnet18', 'mobilenet'
+model: 'resnet8'  # Options: 'cnn4conv', 'resnet8
 reset: 'random'    # Options: 'random', 'continue'
 
 # Logging

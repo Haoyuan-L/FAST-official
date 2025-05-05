@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
-from utils import CNN4Conv
+from utils import *
 
 def get_model(args):
     """Get model based on configuration."""
@@ -13,6 +13,15 @@ def get_model(args):
         if args.in_channels != 3:
             model.conv1 = nn.Conv2d(args.in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         model.fc = nn.Linear(model.fc.in_features, args.num_classes)
+        return model
+    elif args.model == 'resnet8':
+        model = ResNet8(num_classes=args.num_classes)
+        if args.in_channels != 3:
+            model.conv1 = nn.Conv2d(
+                args.in_channels, 64,
+                kernel_size=3, stride=1, padding=1, bias=False
+            )
+            model.bn1 = nn.BatchNorm2d(64)
         return model
     elif args.model == 'mobilenet':
         model = models.mobilenet_v2(pretrained=False)

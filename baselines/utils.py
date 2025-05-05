@@ -45,7 +45,7 @@ class DatasetSplit(Dataset):
         image, label = self.dataset[self.idxs[item]]
         return image, label, self.idxs[item]  # Return index as well
 
-def dir_partition(dataset, num_clients, alpha, equal_samples=True):
+def dir_partition(dataset, num_clients, alpha=1.0, seed=0, dir=False):
     """
     Partition the dataset using Dirichlet distribution.
     
@@ -58,54 +58,87 @@ def dir_partition(dataset, num_clients, alpha, equal_samples=True):
     Returns:
         Dictionary mapping client IDs to list of data indices
     """
-    if equal_samples:
-        return dir_partition_balanced(dataset, num_clients, alpha)
+    if dir:
+        return noniid_partition(dataset, num_clients, alpha)
     else:
-        return dir_partition_original(dataset, num_clients, alpha)
+        return iid_partition(dataset, num_clients, seed)
 
-def dir_partition_original(dataset, num_clients, alpha):
-    """Original Dirichlet partitioning method (potentially unbalanced)."""
-    num_classes = len(np.unique(np.array(dataset.targets)))
+def iid_partition(dataset, num_clients, seed):
+    """
+    Creates an IID partition of the dataset across num_clients.
+    """
+    # Determine total number of samples
+    total_num = len(dataset)
+
+    # Reproducible randomness
+    np.random.seed(seed)
+
+    # Randomly assign each sample index to a client
+    assignments = np.random.choice(num_clients, size=total_num)
+
+    # Build the partition dict
     client_data_dict = {i: [] for i in range(num_clients)}
-    
+    for idx, client_id in enumerate(assignments):
+        client_data_dict[int(client_id)].append(idx)
+
+    return client_data_dict
+
+
+def noniid_partition(dataset, num_clients, alpha):
+    # Number of classes and total samples
+    if hasattr(dataset, 'targets'):
+        targets = dataset.targets
+    else:
+        # fallback if dataset.labels used
+        targets = dataset.labels
+    # ensure targets is a list or array
+    labels_arr = np.array([t.item() if isinstance(t, torch.Tensor) else t for t in targets])
+    num_classes = len(np.unique(labels_arr))
+    total_num = len(labels_arr)
+
     # Group indices by label
     label_indices = {i: [] for i in range(num_classes)}
-    for idx, label in enumerate(dataset.targets):
-        if isinstance(label, torch.Tensor):
-            label = label.item()
-        label_indices[label].append(idx)
-    
-    # Sample client proportions using Dirichlet distribution
-    proportions = np.random.dirichlet(alpha * np.ones(num_clients), num_classes)
-    
-    # Assign samples to clients according to proportions
-    for class_idx, class_proportions in enumerate(proportions):
-        class_size = len(label_indices[class_idx])
-        
-        # Get the number of samples per client for this class
-        num_samples_per_client = np.round(class_proportions * class_size).astype(int)
-        # Adjust to ensure the sum matches the class size
-        num_samples_per_client[-1] = class_size - np.sum(num_samples_per_client[:-1])
-        
-        # Shuffle the indices for this class
-        class_indices = label_indices[class_idx].copy()
-        random.shuffle(class_indices)
-        
-        # Assign indices to clients
-        start_idx = 0
-        for client_idx, num_samples in enumerate(num_samples_per_client):
-            client_data_dict[client_idx].extend(
-                class_indices[start_idx:start_idx + int(num_samples)]
-            )
-            start_idx += int(num_samples)
-    
+    for idx, label in enumerate(labels_arr):
+        label_indices[int(label)].append(idx)
+
+    # Per-client batch containers and size budget
+    client_batches = [[] for _ in range(num_clients)]
+    per_client_budget = math.ceil(total_num / num_clients)
+    min_require_size = 10
+    min_size = 0
+
+    # Repeat splitting until every client has at least min_require_size samples
+    while min_size < min_require_size:
+        # reset batches
+        client_batches = [[] for _ in range(num_clients)]
+        for cls in range(num_classes):
+            idx_list = label_indices[cls].copy()
+            random.shuffle(idx_list)
+
+            # draw Dirichlet proportions for this class across clients
+            props = np.random.dirichlet(alpha * np.ones(num_clients))
+            # zero out proportions for any client already full
+            props = np.array([p * (len(client_batches[i]) < per_client_budget)
+                              for i, p in enumerate(props)])
+            props = props / props.sum()
+
+            # determine cut points and split indices
+            cuts = (np.cumsum(props) * len(idx_list)).astype(int)[:-1]
+            splits = np.split(np.array(idx_list), cuts)
+
+            # assign splits to clients
+            for i in range(num_clients):
+                client_batches[i].extend(splits[i].tolist())
+
+        # check the smallest batch size
+        min_size = min(len(batch) for batch in client_batches)
+        # if too small, retry the random draw
+
+    # build and return dict mapping client -> indices
+    client_data_dict = {i: client_batches[i] for i in range(num_clients)}
     return client_data_dict
 
 def dir_partition_balanced(dataset, num_clients, alpha):
-    """
-    Balanced Dirichlet partitioning method that ensures each client gets approximately 
-    the same number of samples while maintaining class imbalance.
-    """
     num_classes = len(np.unique(np.array(dataset.targets)))
     client_data_dict = {i: [] for i in range(num_clients)}
     
@@ -560,3 +593,79 @@ class CNN4Conv(nn.Module):
     
     def get_embedding_dim(self):
         return self.emb_dim
+
+class BasicBlock(nn.Module):
+    expansion = 1
+
+    def __init__(self, in_planes, planes, stride=1):
+        super(BasicBlock, self).__init__()
+        self.conv1 = nn.Conv2d(
+            in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3,
+                               stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(planes)
+
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != self.expansion*planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion*planes,
+                          kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(self.expansion*planes)
+            )
+
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
+
+class ResNet(nn.Module):
+    def __init__(self, block, num_blocks, num_classes=10):
+        super(ResNet, self).__init__()
+        self.in_planes = 64
+
+        self.conv1 = nn.Conv2d(
+            3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+
+        self.layer_names = []
+        last_planes = self.in_planes
+        strides = [1, 2, 2, 2]
+        planes_list = [64, 128, 256, 512]
+
+        for idx, num_block in enumerate(num_blocks):
+            if num_block > 0:
+                planes = planes_list[idx]
+                stride = strides[idx]
+                layer = self._make_layer(block, planes, num_block, stride)
+                layer_name = f'layer{idx + 1}'
+                setattr(self, layer_name, layer)
+                self.layer_names.append(layer_name)
+                last_planes = planes * block.expansion
+
+        self.linear = nn.Linear(last_planes, num_classes)
+
+    def _make_layer(self, block, planes, num_blocks, stride):
+        strides = [stride] + [1] * (num_blocks - 1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_planes, planes, stride))
+            self.in_planes = planes * block.expansion
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        for layer_name in self.layer_names:
+            out = getattr(self, layer_name)(out)
+        out = F.adaptive_avg_pool2d(out, 1)
+        out = out.view(out.size(0), -1)
+
+        features = out
+        logits   = self.linear(features)
+
+        return logits, features
+
+def ResNet8(num_classes=10):
+    return ResNet(BasicBlock, [1, 1, 1, 1], num_classes=num_classes)

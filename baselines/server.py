@@ -1,5 +1,5 @@
 import flwr as fl
-from flwr.common import Metrics
+from flwr.common import Metrics, Parameters
 from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 from collections import OrderedDict
@@ -55,6 +55,40 @@ def weighted_average(metrics: List[Tuple[int, Dict[str, float]]]) -> Dict[str, f
     
     # Compute the weighted average for each key
     return {key: values[0] / values[1] if values[1] > 0 else 0 for key, values in weighted_metrics.items()}
+
+class SafeAggregationStrategy(fl.server.strategy.FedAvg):
+    """Safe aggregation strategy that handles empty results properly."""
+    
+    def aggregate_fit(
+        self,
+        server_round: int,
+        results: List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.FitRes]],
+        failures: List[Union[Tuple[fl.server.client_proxy.ClientProxy, fl.common.FitRes], BaseException]],
+    ) -> Optional[Parameters]:
+        """Aggregate fit results with safety checks."""
+        if not results:
+            # If no valid results, return empty parameters
+            return None, {}
+        
+        # Print info on client failures if any
+        if failures:
+            print(f"Warning: {len(failures)} clients failed during training")
+            for failure in failures:
+                if isinstance(failure, BaseException):
+                    print(f"Client failed with: {str(failure)}")
+                else:
+                    print(f"Client returned failure: {failure}")
+        
+        # Proceed with regular aggregation
+        try:
+            return super().aggregate_fit(server_round, results, failures)
+        except Exception as e:
+            print(f"Error in aggregation: {str(e)}")
+            # If aggregation fails, return initial parameters if available
+            if hasattr(self, 'initial_parameters'):
+                return self.initial_parameters, {}
+            return None, {}
+
 
 class FedAvgServer:
     def __init__(self, args):
@@ -117,7 +151,7 @@ class FedAvgServer:
     def get_fl_strategy(self):
         """Return the FL strategy."""
         if self.args.fl_strategy == 'fedavg':
-            return fl.server.strategy.FedAvg(
+            return SafeAggregationStrategy(
                 fraction_fit=1.0,  # Sample 100% of clients for training
                 fraction_evaluate=1.0,  # Sample 100% of clients for evaluation
                 min_fit_clients=self.args.num_clients,  # Number of clients needed for training
@@ -135,7 +169,7 @@ class FedAvgServer:
                 config["proximal_mu"] = self.args.mu  # Add proximal term coefficient
                 return config
                 
-            return fl.server.strategy.FedAvg(
+            return SafeAggregationStrategy(
                 fraction_fit=1.0,
                 fraction_evaluate=1.0,
                 min_fit_clients=self.args.num_clients,
@@ -176,6 +210,11 @@ class FedAvgServer:
         with torch.no_grad():
             for data, target in test_loader:
                 data, target = data.to(self.args.device), target.to(self.args.device)
+                
+                # Ensure target is the correct shape
+                if len(target.shape) > 1 and target.shape[1] == 1:
+                    target = target.squeeze(-1)
+                
                 output, _ = self.global_model(data)
                 loss += torch.nn.functional.cross_entropy(output, target, reduction='sum').item()
                 pred = output.argmax(dim=1, keepdim=True)
