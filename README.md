@@ -15,15 +15,20 @@
 </div>
 
 <div align="center">
-
+![visitors](https://visitor-badge.laobi.icu/badge?page_id=Haoyuan-L.FAST-official&left_color=blue&right_color=orange)
 [![arXiv](https://img.shields.io/badge/arXiv-2504.03783-blue?logo=arxiv&logoColor=orange)](https://arxiv.org/abs/2504.03783)
-[![Project Page](https://img.shields.io/badge/Project%20Page-Online-brightgreen)](https://haoyuan-l.github.io/fast/)
+[![IoTJ](https://img.shields.io/badge/IoTJ%202025-Accepted-yellow.svg)](https://ieeexplore.ieee.org/abstract/document/11008538)
 
 </div>
 
 ## 📝 Abstract
 
 FAST is a two-pass federated active learning framework that reduces communication costs by **8x** while achieving **4.36% higher accuracy** than existing methods. We leverage foundation models for weak labeling, followed by human refinement of uncertain samples, using only **5% labeling budget**.
+
+<div align="center">
+<img src="log/FAST_overview.jpg" width="90%">
+<p><em>Overview of FAST: Two-pass federated active learning framework</em></p>
+</div>
 
 ## 🌟 Key Features
 
@@ -44,24 +49,30 @@ cd FAST-official
 ### Basic Usage
 ```bash
 # CIFAR-10 with default settings
-python main.py --dataset cifar10 --num_clients 10 --budget 0.05
+python main.py
 
-# Medical datasets
-python main.py --dataset pathmnist --foundation_model evaclip
-
-# Compare with baselines
-python run_baselines.py --methods random,entropy,kafal
 ```
 
 ## 📊 Results
 
-| Method | CIFAR-10 | SVHN | PathMNIST | Budget | Rounds |
-|--------|----------|------|-----------|---------|--------|
-| Random | 64.19 | 80.90 | 68.41 | 20% | 400 |
-| KAFAL | - | - | - | 20% | 400 |
-| **FAST** | **77.14** | **87.91** | **88.48** | **5%** | **100** |
+### Performance and Communication Efficiency Comparison
 
-**Communication Efficiency**: 87.3% cost reduction, 76.7% time reduction
+| Method | CIFAR-10 |  |  | CIFAR-100 |  |  | SVHN |  |  |
+|--------|----------|----------|----------|-----------|----------|----------|----------|----------|----------|
+|        | Acc. (%) | Comm. Cost (MB) | Walltime (s) | Acc. (%) | Comm. Cost (MB) | Walltime (s) | Acc. (%) | Comm. Cost (MB) | Walltime (s) |
+| Random | 69.14 | 7090.94 | 30398.95 | 32.67 | 8502.69 | 37258.75 | 85.47 | 6969.79 | 58064.42 |
+| LoGo   | 71.92 | 7090.94 | 32709.14 | 34.27 | 8502.69 | 39268.24 | 87.08 | 6969.79 | 61638.97 |
+| **FAST** | **77.16** ↑ | **902.54** (↓87.3%) | **7342.52** (↓76.7%) | **41.94** ↑ | **1079.56** (↓87.3%) | **15104.38** (↓60.5%) | **88.79** ↑ | **896.72** (↓87.1%) | **19178.83** (↓68.0%) |
+
+*FAST uses 1 AL round (100 FL rounds) vs. baselines using 8 AL rounds (800 FL rounds)*
+
+### Experimental Results on CIFAR-10 and CIFAR-100
+
+<div align="center">
+<img src="log/CIFAR10_acc_com_page-0001.jpg" width="48%">
+<img src="log/CIFAR100_acc_com_page-0001.jpg" width="48%">
+<p><em>Left: CIFAR-10 results. Right: CIFAR-100 results. FAST achieves superior performance with significantly fewer communication rounds.</em></p>
+</div>
 
 ## 🔧 Configuration
 
@@ -75,11 +86,10 @@ Key parameters:
 
 ```bibtex
 @article{li2025fast,
-  title={FAST: Federated Active Learning With Foundation Models for Communication-Efficient Sampling and Training},
+  title={FAST: Federated Active Learning with Foundation Models for Communication-efficient Sampling and Training},
   author={Li, Haoyuan and Funk, Mathias and Wang, Jindong and Saeed, Aaqib},
-  journal={IEEE Internet of Things Journal},
-  year={2025},
-  publisher={IEEE}
+  journal={arXiv preprint arXiv:2504.03783},
+  year={2025}
 }
 ```
 
