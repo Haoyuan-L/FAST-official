@@ -15,9 +15,10 @@
 </div>
 
 <div align="center">
-![visitors](https://visitor-badge.laobi.icu/badge?page_id=Haoyuan-L.FAST-official&left_color=blue&right_color=orange)
-[![arXiv](https://img.shields.io/badge/arXiv-2504.03783-blue?logo=arxiv&logoColor=orange)](https://arxiv.org/abs/2504.03783)
-[![IoTJ](https://img.shields.io/badge/IoTJ%202025-Accepted-yellow.svg)](https://ieeexplore.ieee.org/abstract/document/11008538)
+
+<img src="https://visitor-badge.laobi.icu/badge?page_id=Haoyuan-L.FAST-official&left_color=blue&right_color=orange" alt="visitors">
+<a href="https://arxiv.org/abs/2504.03783"><img src="https://img.shields.io/badge/arXiv-2504.03783-blue?logo=arxiv&logoColor=orange" alt="arXiv"></a>
+<a href="https://ieeexplore.ieee.org/abstract/document/11008538"><img src="https://img.shields.io/badge/IoTJ%202025-Accepted-yellow.svg" alt="IoTJ"></a>
 
 </div>
 
