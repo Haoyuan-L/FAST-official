@@ -87,10 +87,11 @@ Key parameters:
 
 ```bibtex
 @article{li2025fast,
-  title={FAST: Federated Active Learning with Foundation Models for Communication-efficient Sampling and Training},
+  title={FAST: Federated Active Learning With Foundation Models for Communication-Efficient Sampling and Training},
   author={Li, Haoyuan and Funk, Mathias and Wang, Jindong and Saeed, Aaqib},
-  journal={arXiv preprint arXiv:2504.03783},
-  year={2025}
+  journal={IEEE Internet of Things Journal},
+  year={2025},
+  publisher={IEEE}
 }
 ```
 
